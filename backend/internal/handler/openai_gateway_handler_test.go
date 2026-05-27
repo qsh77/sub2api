@@ -174,11 +174,7 @@ func TestOpenAIEnsureForwardErrorResponse_WritesFallbackWhenNotWritten(t *testin
 	assert.Equal(t, "Upstream request failed", errorObj["message"])
 }
 
-// Writer 已写后 ensureForwardErrorResponse 必须仍然把错误信息以 SSE
-// 形式追加给客户端（streamStarted 强制 true）。
-// 这是 case B 修复：旧实现遇到 Writer.Written 直接 return false，
-// 客户端只能拿到 silent EOF；Codex CLI 报 "stream closed before response.completed"。
-func TestOpenAIEnsureForwardErrorResponse_AppendsSSEAfterWritten(t *testing.T) {
+func TestOpenAIEnsureForwardErrorResponse_DoesNotOverrideWrittenResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -188,34 +184,9 @@ func TestOpenAIEnsureForwardErrorResponse_AppendsSSEAfterWritten(t *testing.T) {
 	h := &OpenAIGatewayHandler{}
 	wrote := h.ensureForwardErrorResponse(c, false)
 
-	require.True(t, wrote, "must attempt to communicate the failure to the client via SSE")
-	// 状态码改不了（headers 已 flush），但 body 应该追加 SSE 错误事件。
+	require.False(t, wrote)
 	require.Equal(t, http.StatusTeapot, w.Code)
-	assert.Contains(t, w.Body.String(), "already written")
-	// 非 /responses 路径走 legacy event: error 分支。
-	assert.Contains(t, w.Body.String(), "event: error\n")
-}
-
-// case B 回归测试：/responses 路径，Writer 已被写过（模拟 ping flushed），
-// ensureForwardErrorResponse 必须发 response.failed，让 Codex 收到合规终止事件。
-func TestOpenAIEnsureForwardErrorResponse_ResponsesRouteAfterWrittenEmitsResponseFailed(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest(http.MethodPost, EndpointResponses, nil)
-	// 模拟 ping 已 flush 的状态：Writer 已写过 1 个字节
-	_, _ = c.Writer.WriteString(":\n\n")
-
-	h := &OpenAIGatewayHandler{}
-	wrote := h.ensureForwardErrorResponse(c, false)
-
-	require.True(t, wrote)
-	body := w.Body.String()
-	assert.Contains(t, body, ":\n\n", "earlier ping bytes preserved")
-	assert.Contains(t, body, "event: response.failed\n", "appended a Responses terminal event")
-	assert.Contains(t, body, `"type":"response.failed"`)
-	assert.Contains(t, body, `"code":"upstream_error"`)
-	assert.Contains(t, body, "Upstream request failed")
+	assert.Equal(t, "already written", w.Body.String())
 }
 
 func TestShouldLogOpenAIForwardFailureAsWarn(t *testing.T) {
@@ -295,9 +266,7 @@ func TestOpenAIRecoverResponsesPanic_NoPanicNoWrite(t *testing.T) {
 	assert.Equal(t, "", w.Body.String())
 }
 
-// Panic 在已 flush 的 /v1/responses 流中：状态码无法改（已 written），
-// 但 body 应追加 response.failed 让客户端识别为合规截断而不是 silent EOF。
-func TestOpenAIRecoverResponsesPanic_AppendsResponseFailedAfterWritten(t *testing.T) {
+func TestOpenAIRecoverResponsesPanic_DoesNotOverrideWrittenResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	w := httptest.NewRecorder()
@@ -315,9 +284,7 @@ func TestOpenAIRecoverResponsesPanic_AppendsResponseFailedAfterWritten(t *testin
 	})
 
 	require.Equal(t, http.StatusTeapot, w.Code)
-	body := w.Body.String()
-	assert.Contains(t, body, "already written")
-	assert.Contains(t, body, "event: response.failed\n")
+	assert.Equal(t, "already written", w.Body.String())
 }
 
 func TestOpenAIMissingResponsesDependencies(t *testing.T) {
@@ -1201,7 +1168,7 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 		}, nil, nil, nil)
 	}
 
-	billingCacheSvc := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
+	billingCacheSvc := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg)
 	gatewaySvc := service.NewOpenAIGatewayService(
 		accountRepo,
 		usageRepo,
@@ -1223,7 +1190,6 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 		channelSvc,
 		nil,
 		nil,
-		nil, // userPlatformQuotaRepo
 	)
 
 	cache := &concurrencyCacheMock{

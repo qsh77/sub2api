@@ -32,7 +32,7 @@
         class="absolute bottom-1/4 right-1/4 h-64 w-64 rounded-full bg-primary-400/10 blur-3xl"
       ></div>
       <div
-        class="absolute inset-0 bg-[linear-gradient(rgba(20,184,166,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.03)_1px,transparent_1px)] bg-[size:64px_64px]"
+        class="absolute inset-0 bg-[linear-gradient(rgba(51,156,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(51,156,255,0.03)_1px,transparent_1px)] bg-[size:64px_64px]"
       ></div>
     </div>
 
@@ -42,7 +42,7 @@
         <!-- Logo -->
         <div class="flex items-center">
           <div class="h-10 w-10 overflow-hidden rounded-xl shadow-md">
-            <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
+            <img :src="siteLogo || DEFAULT_LOGO_URL" alt="Logo" class="h-full w-full object-contain" />
           </div>
         </div>
 
@@ -211,7 +211,7 @@
             class="group rounded-2xl border border-gray-200/50 bg-white/60 p-6 backdrop-blur-sm transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/10 dark:border-dark-700/50 dark:bg-dark-800/60"
           >
             <div
-              class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/30 transition-transform group-hover:scale-110"
+              class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 shadow-lg shadow-primary-500/30 transition-transform group-hover:scale-110"
             >
               <Icon name="server" size="lg" class="text-white" />
             </div>
@@ -390,14 +390,6 @@
           >
             {{ t('home.docs') }}
           </a>
-          <a
-            :href="githubUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
-          >
-            GitHub
-          </a>
         </div>
       </div>
     </footer>
@@ -410,6 +402,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore, useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { DEFAULT_LOGO_URL } from '@/constants/branding'
 
 const { t } = useI18n()
 
@@ -431,9 +424,6 @@ const isHomeContentUrl = computed(() => {
 
 // Theme
 const isDark = ref(document.documentElement.classList.contains('dark'))
-
-// GitHub URL
-const githubUrl = 'https://github.com/Wei-Shaw/sub2api'
 
 // Auth state
 const isAuthenticated = computed(() => authStore.isAuthenticated)
@@ -596,7 +586,7 @@ onMounted(() => {
   color: #a78bfa;
 }
 .code-url {
-  color: #14b8a6;
+  color: #339CFF;
 }
 .code-comment {
   color: #64748b;
@@ -637,8 +627,8 @@ onMounted(() => {
 :deep(.dark) .terminal-window {
   box-shadow:
     0 25px 50px -12px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(20, 184, 166, 0.2),
-    0 0 40px rgba(20, 184, 166, 0.1),
+    0 0 0 1px rgba(51, 156, 255, 0.2),
+    0 0 40px rgba(51, 156, 255, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 </style>

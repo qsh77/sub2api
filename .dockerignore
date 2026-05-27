@@ -21,6 +21,8 @@ docs/
 # OS files
 .DS_Store
 Thumbs.db
+._*
+**/._*
 
 # Build artifacts
 dist/
@@ -51,6 +53,10 @@ config.local.yaml
 # Logs
 *.log
 logs/
+data/
+redis_data/
+postgres_data/
+migration/
 
 # Temporary files
 tmp/

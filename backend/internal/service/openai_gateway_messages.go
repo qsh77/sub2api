@@ -231,7 +231,6 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	if policyErr != nil {
 		var blocked *OpenAIFastBlockedError
 		if errors.As(policyErr, &blocked) {
-			MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalPolicyDenied)
 			writeAnthropicError(c, http.StatusForbidden, "forbidden_error", blocked.Message)
 		}
 		return nil, policyErr
@@ -570,12 +569,6 @@ func (s *OpenAIGatewayService) readOpenAICompatBufferedTerminal(
 					if err := json.Unmarshal([]byte(payload), &event); err == nil {
 						acc.ProcessEvent(&event)
 						if isOpenAICompatResponsesTerminalEvent(event.Type) && event.Response != nil {
-							if event.Usage != nil {
-								usage = copyOpenAIUsageFromResponsesUsage(event.Usage)
-								if event.Response.Usage == nil {
-									event.Response.Usage = event.Usage
-								}
-							}
 							if event.Response.Usage != nil {
 								usage = copyOpenAIUsageFromResponsesUsage(event.Response.Usage)
 							}
@@ -617,12 +610,6 @@ func (s *OpenAIGatewayService) readOpenAICompatBufferedTerminal(
 			acc.ProcessEvent(&event)
 
 			if isOpenAICompatResponsesTerminalEvent(event.Type) && event.Response != nil {
-				if event.Usage != nil {
-					usage = copyOpenAIUsageFromResponsesUsage(event.Usage)
-					if event.Response.Usage == nil {
-						event.Response.Usage = event.Usage
-					}
-				}
 				if event.Response.Usage != nil {
 					usage = copyOpenAIUsageFromResponsesUsage(event.Response.Usage)
 				}
@@ -725,18 +712,14 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 			return false
 		}
 
+		// 仅按兼容转换器支持的终止事件提取 usage，避免无意扩大事件语义。
 		isTerminalEvent := isOpenAICompatResponsesTerminalEvent(event.Type)
-		if isTerminalEvent {
-			if event.Response != nil {
-				if id := strings.TrimSpace(event.Response.ID); id != "" {
-					responseID = id
-				}
-				if event.Response.Usage != nil {
-					usage = copyOpenAIUsageFromResponsesUsage(event.Response.Usage)
-				}
+		if isTerminalEvent && event.Response != nil {
+			if id := strings.TrimSpace(event.Response.ID); id != "" {
+				responseID = id
 			}
-			if event.Usage != nil {
-				usage = copyOpenAIUsageFromResponsesUsage(event.Usage)
+			if event.Response.Usage != nil {
+				usage = copyOpenAIUsageFromResponsesUsage(event.Response.Usage)
 			}
 		}
 

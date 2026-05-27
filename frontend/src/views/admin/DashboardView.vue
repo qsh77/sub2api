@@ -491,13 +491,13 @@ const userTrendChartData = computed(() => {
 
   const sortedDates = Array.from(allDates).sort()
   const colors = [
-    '#3b82f6',
+    '#339CFF',
     '#10b981',
     '#f59e0b',
     '#ef4444',
     '#8b5cf6',
     '#ec4899',
-    '#14b8a6',
+    '#8fcbff',
     '#f97316',
     '#6366f1',
     '#84cc16',
@@ -537,15 +537,16 @@ const formatNumber = (value: number): string => {
   return value.toLocaleString()
 }
 
-const formatCost = (value: number): string => {
-  if (value >= 1000) {
-    return (value / 1000).toFixed(2) + 'K'
-  } else if (value >= 1) {
-    return value.toFixed(2)
-  } else if (value >= 0.01) {
-    return value.toFixed(3)
+const formatCost = (value?: number | null): string => {
+  const amount = Number(value) || 0
+  if (amount >= 1000) {
+    return (amount / 1000).toFixed(2) + 'K'
+  } else if (amount >= 1) {
+    return amount.toFixed(2)
+  } else if (amount >= 0.01) {
+    return amount.toFixed(3)
   }
-  return value.toFixed(4)
+  return amount.toFixed(4)
 }
 
 const formatDuration = (ms: number): string => {

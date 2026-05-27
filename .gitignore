@@ -71,6 +71,7 @@ docker-compose.override.yml
 # 操作系统
 # ===================
 .DS_Store
+._*
 Thumbs.db
 Desktop.ini
 
@@ -104,6 +105,11 @@ backend/internal/web/dist/*
 
 # 后端运行时缓存数据
 backend/data/
+data/
+postgres_data/
+redis_data/
+migration/*.dump
+migration/*.tar.gz
 
 # ===================
 # 本地配置文件（包含敏感信息）

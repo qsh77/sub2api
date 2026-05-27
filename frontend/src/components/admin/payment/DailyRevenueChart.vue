@@ -51,8 +51,8 @@ const chartData = computed(() => {
       {
         label: t('payment.admin.revenue'),
         data: props.data.map(d => d.amount),
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderColor: 'rgb(51, 156, 255)',
+        backgroundColor: 'rgba(51, 156, 255, 0.1)',
         fill: true,
         tension: 0.3,
         pointRadius: 3,

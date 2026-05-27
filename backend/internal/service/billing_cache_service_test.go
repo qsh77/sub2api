@@ -68,25 +68,9 @@ func (b *billingCacheWorkerStub) InvalidateAPIKeyRateLimit(ctx context.Context, 
 	return nil
 }
 
-func (b *billingCacheWorkerStub) GetUserPlatformQuotaCache(ctx context.Context, userID int64, platform string) (*UserPlatformQuotaCacheEntry, bool, error) {
-	return nil, false, nil
-}
-
-func (b *billingCacheWorkerStub) SetUserPlatformQuotaCache(ctx context.Context, userID int64, platform string, entry *UserPlatformQuotaCacheEntry, ttl time.Duration) error {
-	return nil
-}
-
-func (b *billingCacheWorkerStub) DeleteUserPlatformQuotaCache(ctx context.Context, userID int64, platform string) error {
-	return nil
-}
-
-func (b *billingCacheWorkerStub) IncrUserPlatformQuotaUsageCache(ctx context.Context, userID int64, platform string, cost float64, ttl time.Duration) error {
-	return nil
-}
-
 func TestBillingCacheServiceQueueHighLoad(t *testing.T) {
 	cache := &billingCacheWorkerStub{}
-	svc := NewBillingCacheService(cache, nil, nil, nil, nil, nil, &config.Config{}, nil)
+	svc := NewBillingCacheService(cache, nil, nil, nil, nil, nil, &config.Config{})
 	t.Cleanup(svc.Stop)
 
 	start := time.Now()
@@ -108,7 +92,7 @@ func TestBillingCacheServiceQueueHighLoad(t *testing.T) {
 
 func TestBillingCacheServiceEnqueueAfterStopReturnsFalse(t *testing.T) {
 	cache := &billingCacheWorkerStub{}
-	svc := NewBillingCacheService(cache, nil, nil, nil, nil, nil, &config.Config{}, nil)
+	svc := NewBillingCacheService(cache, nil, nil, nil, nil, nil, &config.Config{})
 	svc.Stop()
 
 	enqueued := svc.enqueueCacheWrite(cacheWriteTask{

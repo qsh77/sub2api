@@ -634,15 +634,6 @@ export default {
     platformBreakdownEmpty: 'No platform usage yet',
     platformCount: '{count} platforms',
     platformOther: 'Other',
-    platformQuota: {
-      title: 'Quota Usage',
-      daily: 'Daily',
-      weekly: 'Weekly',
-      monthly: 'Monthly (30-day rolling)',
-      resetsAt: 'Resets {time}',
-      noLimit: 'unlimited',
-      disabled: 'Disabled',
-    },
     tokenUsageTrend: 'Token Usage Trend',
     noDataAvailable: 'No data available',
     model: 'Model',
@@ -1802,7 +1793,6 @@ export default {
         groups: 'Groups',
         subscriptions: 'Subscriptions',
         balance: 'Balance',
-        balancePlatformQuota: 'Balance (Platform Quota)',
         usage: 'Usage',
         usageAnthropic: 'Usage (Claude)',
         usageOpenAI: 'Usage (OpenAI)',
@@ -1995,41 +1985,6 @@ export default {
         failedToReorder: 'Failed to update order',
         keyExists: 'Attribute key already exists',
         dragToReorder: 'Drag to reorder'
-      },
-      platformQuota: {
-        menuItem: 'Platform Quotas',
-        title: 'Platform Quotas',
-        subtitle: 'Configure daily / weekly / monthly USD usage limits for each upstream platform for user {email}',
-        columns: {
-          platform: 'Platform',
-          daily: 'Daily (USD)',
-          weekly: 'Weekly (USD)',
-          monthly: 'Monthly (USD, 30-day rolling)',
-          usage: 'Current Usage',
-        },
-        placeholder: 'unlimited',
-        save: 'Save',
-        saving: 'Saving...',
-        cancel: 'Cancel',
-        clearAll: 'Clear All (remove all limits)',
-        clearAllConfirm: 'Clear daily / weekly / monthly limits for ALL platforms? All platforms will become "unlimited" with no local undo — you must manually re-enter values before saving.',
-        reset: {
-          button: 'Reset window',
-          confirm: 'Reset the {window} usage for {platform} for this user? This is effective immediately.',
-          success: 'Reset {platform} {window} usage',
-          failed: 'Reset failed',
-        },
-        updateSuccess: 'Platform quotas updated',
-        updateFailed: 'Save failed',
-        loadFailed: 'Load failed',
-        hint: 'Empty = no limit for that window.',
-        windowDaily: 'daily',
-        windowWeekly: 'weekly',
-        windowMonthly: 'monthly',
-        cellNotConfigured: 'Not configured',
-        cellColumnTooltip: 'Only platforms with a limit are shown',
-        subscriptionWarning: 'This user has an active subscription. Platform quotas only apply to balance (standard) mode requests; subscription mode requests are not subject to these limits.',
-        invalidNumber: 'The following fields contain invalid numbers. Please fix them before saving: {fields}',
       }
     },
 
@@ -2609,17 +2564,11 @@ export default {
       lastCleanup: 'Last cleanup: {time}',
       cleanupStats: 'Last cleanup deleted {hit} hits and {nonHit} non-hits',
       riskSwitchOff: 'System switch off',
-      riskThresholds: 'Risk Thresholds',
-      riskThresholdsHint: 'Adjust hit thresholds by OpenAI Moderations category. Scores greater than or equal to the threshold count as hits.',
-      riskThresholdDefault: 'Default {value}',
-      riskThresholdReset: 'Restore defaults',
-      riskThresholdPercent: 'Threshold percentage',
       tabs: {
         basic: 'Basic',
         scope: 'Scope',
         runtime: 'Runtime',
         response: 'Hit Notice',
-        riskThresholds: 'Risk Thresholds',
         keywords: 'Keyword Block',
         retention: 'Retention',
       },
@@ -5518,17 +5467,7 @@ export default {
         defaultSubscriptionsDuplicate:
           'Duplicate subscription group: {groupId}. Each group can only appear once.',
         subscriptionGroup: 'Subscription Group',
-        subscriptionValidityDays: 'Validity (days)',
-        defaultPlatformQuotas: 'Default Platform Quotas (on signup)',
-        defaultPlatformQuotasHint: 'Automatically assigned to new users on signup; existing users are not affected. Leave blank = unlimited.',
-        platformQuotaNotice: 'Monthly quota uses a 30-day rolling window, not a calendar month.',
-      },
-      platformQuota: {
-        platform:    'Platform',
-        daily:       'Daily (USD)',
-        weekly:      'Weekly (USD)',
-        monthly:     'Monthly (USD, 30d rolling)',
-        placeholder: 'Unlimited',
+        subscriptionValidityDays: 'Validity (days)'
       },
       claudeCode: {
         title: 'Claude Code Settings',
@@ -6249,9 +6188,7 @@ export default {
         grantOnFirstBindHint: 'Grant default entitlements when an existing user first binds this source.',
         defaultSubscriptionsLabel: 'Default subscriptions',
         defaultSubscriptionsHint: 'Applies only to this auth source. Leave empty to skip source-specific subscriptions.',
-        noSourceSubscriptions: 'No source-specific default subscriptions configured.',
-        platformQuotasOverride: 'Platform Quota Overrides',
-        platformQuotasOverrideHint: 'Blank fields inherit the system default. Set to 0 to fully block that window for this auth source.',
+        noSourceSubscriptions: 'No source-specific default subscriptions configured.'
       },
       paymentVisibleMethods: {
         methodLabel: '{title} visible method',
@@ -6551,7 +6488,7 @@ export default {
       },
       createGroup: {
         title: '➕ Create New Group',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Let\'s create your first group.</p><p style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📝 Tip:</b> Recommend creating a test group first to familiarize yourself with the process</p><p style="color: #10b981; font-weight: 600;">👉 Click the "Create Group" button</p></div>'
+        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Let\'s create your first group.</p><p style="padding: 8px 12px; background: #eff7ff; border-left: 3px solid #339CFF; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📝 Tip:</b> Recommend creating a test group first to familiarize yourself with the process</p><p style="color: #10b981; font-weight: 600;">👉 Click the "Create Group" button</p></div>'
       },
       groupName: {
         title: '✏️ 1. Group Name',
@@ -6560,7 +6497,7 @@ export default {
       },
       groupPlatform: {
         title: '🤖 2. Select Platform',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Choose the AI platform this group supports.</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📌 Platform Guide:</b><ul style="margin: 8px 0 0 16px;"><li><b>Anthropic</b> - Claude models</li><li><b>OpenAI</b> - GPT models</li><li><b>Google</b> - Gemini models</li></ul></div><p style="font-size: 13px; color: #6b7280;">One group can only have one platform</p></div>',
+        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Choose the AI platform this group supports.</p><div style="padding: 8px 12px; background: #eff7ff; border-left: 3px solid #339CFF; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📌 Platform Guide:</b><ul style="margin: 8px 0 0 16px;"><li><b>Anthropic</b> - Claude models</li><li><b>OpenAI</b> - GPT models</li><li><b>Google</b> - Gemini models</li></ul></div><p style="font-size: 13px; color: #6b7280;">One group can only have one platform</p></div>',
         nextBtn: 'Next'
       },
       groupMultiplier: {
@@ -6570,7 +6507,7 @@ export default {
       },
       groupExclusive: {
         title: '🔒 4. Exclusive Group (Optional)',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Control group visibility and access permissions.</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🔐 Permission Guide:</b><ul style="margin: 8px 0 0 16px;"><li><b>Off</b> - Public group, visible to all users</li><li><b>On</b> - Exclusive group, only for specified users</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Use Cases:</b> VIP exclusive, internal testing, special customers</p></div>',
+        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Control group visibility and access permissions.</p><div style="padding: 8px 12px; background: #eff7ff; border-left: 3px solid #339CFF; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🔐 Permission Guide:</b><ul style="margin: 8px 0 0 16px;"><li><b>Off</b> - Public group, visible to all users</li><li><b>On</b> - Exclusive group, only for specified users</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Use Cases:</b> VIP exclusive, internal testing, special customers</p></div>',
         nextBtn: 'Next'
       },
       groupSubmit: {
@@ -6579,7 +6516,7 @@ export default {
       },
       accountManage: {
         title: '🔗 Step 2: Add Account',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>Great! Group created successfully 🎉</b></p><p style="margin-bottom: 12px;">Now add upstream AI service accounts to enable actual service delivery.</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🔑 Account Purpose:</b><ul style="margin: 8px 0 0 16px;"><li>Connect to upstream AI services (Claude, GPT, etc.)</li><li>One group can contain multiple accounts (load balancing)</li><li>Supports OAuth and Session Key methods</li></ul></div><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 Click "Account Management" on the left sidebar</p></div>'
+        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>Great! Group created successfully 🎉</b></p><p style="margin-bottom: 12px;">Now add upstream AI service accounts to enable actual service delivery.</p><div style="padding: 8px 12px; background: #eff7ff; border-left: 3px solid #339CFF; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🔑 Account Purpose:</b><ul style="margin: 8px 0 0 16px;"><li>Connect to upstream AI services (Claude, GPT, etc.)</li><li>One group can contain multiple accounts (load balancing)</li><li>Supports OAuth and Session Key methods</li></ul></div><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 Click "Account Management" on the left sidebar</p></div>'
       },
       createAccount: {
         title: '➕ Add New Account',
@@ -6597,12 +6534,12 @@ export default {
       },
       accountType: {
         title: '🔐 3. Authorization Method',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Choose the account authorization method.</p><div style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>✅ Recommended: OAuth Method</b><ul style="margin: 8px 0 0 16px;"><li>No manual key extraction needed</li><li>More secure with auto-refresh support</li><li>Works with Claude Code, ChatGPT OAuth</li></ul></div><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px;"><b>📌 Session Key Method</b><ul style="margin: 8px 0 0 16px;"><li>Requires manual extraction from browser</li><li>May need periodic updates</li><li>For platforms without OAuth support</li></ul></div></div>',
+        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Choose the account authorization method.</p><div style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>✅ Recommended: OAuth Method</b><ul style="margin: 8px 0 0 16px;"><li>No manual key extraction needed</li><li>More secure with auto-refresh support</li><li>Works with Claude Code, ChatGPT OAuth</li></ul></div><div style="padding: 8px 12px; background: #eff7ff; border-left: 3px solid #339CFF; border-radius: 4px; font-size: 13px;"><b>📌 Session Key Method</b><ul style="margin: 8px 0 0 16px;"><li>Requires manual extraction from browser</li><li>May need periodic updates</li><li>For platforms without OAuth support</li></ul></div></div>',
         nextBtn: 'Next'
       },
       accountPriority: {
         title: '⚖️ 4. Priority (Optional)',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Set the account call priority.</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📊 Priority Rules:</b><ul style="margin: 8px 0 0 16px;"><li>Lower number = higher priority</li><li>System uses low-value accounts first</li><li>Same priority = random selection</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Use Case:</b> Set main account to lower value, backup accounts to higher value</p></div>',
+        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Set the account call priority.</p><div style="padding: 8px 12px; background: #eff7ff; border-left: 3px solid #339CFF; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📊 Priority Rules:</b><ul style="margin: 8px 0 0 16px;"><li>Lower number = higher priority</li><li>System uses low-value accounts first</li><li>Same priority = random selection</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Use Case:</b> Set main account to lower value, backup accounts to higher value</p></div>',
         nextBtn: 'Next'
       },
       accountGroups: {
@@ -6612,11 +6549,11 @@ export default {
       },
       accountSubmit: {
         title: '✅ Save Account',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Confirm the information and click save.</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📌 OAuth Flow:</b><ul style="margin: 8px 0 0 16px;"><li>Will redirect to service provider page after clicking save</li><li>Complete login and authorization on provider page</li><li>Auto-return after successful authorization</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>📌 Next Step:</b> After adding account, we\'ll create an API key</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click "Save" button</p></div>'
+        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Confirm the information and click save.</p><div style="padding: 8px 12px; background: #eff7ff; border-left: 3px solid #339CFF; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📌 OAuth Flow:</b><ul style="margin: 8px 0 0 16px;"><li>Will redirect to service provider page after clicking save</li><li>Complete login and authorization on provider page</li><li>Auto-return after successful authorization</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>📌 Next Step:</b> After adding account, we\'ll create an API key</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click "Save" button</p></div>'
       },
       keyManage: {
         title: '🔑 Step 3: Generate Key',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>Congratulations! Account setup complete 🎉</b></p><p style="margin-bottom: 12px;">Final step: generate an API Key to test if the service works properly.</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🔑 API Key Purpose:</b><ul style="margin: 8px 0 0 16px;"><li>Credential for calling AI services</li><li>Each key is bound to one group</li><li>Can set quota and expiration</li><li>Supports independent usage statistics</li></ul></div><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 Click "API Keys" on the left sidebar</p></div>'
+        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>Congratulations! Account setup complete 🎉</b></p><p style="margin-bottom: 12px;">Final step: generate an API Key to test if the service works properly.</p><div style="padding: 8px 12px; background: #eff7ff; border-left: 3px solid #339CFF; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🔑 API Key Purpose:</b><ul style="margin: 8px 0 0 16px;"><li>Credential for calling AI services</li><li>Each key is bound to one group</li><li>Can set quota and expiration</li><li>Supports independent usage statistics</li></ul></div><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 Click "API Keys" on the left sidebar</p></div>'
       },
       createKey: {
         title: '➕ Create Key',
@@ -6629,7 +6566,7 @@ export default {
       },
       keyGroup: {
         title: '🎯 2. Select Group',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Select the group you just configured.</p><div style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📌 Group Determines:</b><ul style="margin: 8px 0 0 16px;"><li>Which accounts this key can use</li><li>What billing multiplier applies</li><li>Whether it\'s an exclusive key</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Tip:</b> Select the test group you just created</p></div>',
+        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Select the group you just configured.</p><div style="padding: 8px 12px; background: #eff7ff; border-left: 3px solid #339CFF; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>📌 Group Determines:</b><ul style="margin: 8px 0 0 16px;"><li>Which accounts this key can use</li><li>What billing multiplier applies</li><li>Whether it\'s an exclusive key</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 Tip:</b> Select the test group you just created</p></div>',
         nextBtn: 'Next'
       },
       keySubmit: {
@@ -6647,7 +6584,7 @@ export default {
       },
       keyManage: {
         title: '🔑 API Key Management',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Manage all your API access keys here.</p><p style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px;"><b>📌 What is an API Key?</b><br/>An API key is your credential for accessing AI services, like a key that allows your application to call AI capabilities.</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click to enter key page</p></div>'
+        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Manage all your API access keys here.</p><p style="padding: 8px 12px; background: #eff7ff; border-left: 3px solid #339CFF; border-radius: 4px; font-size: 13px;"><b>📌 What is an API Key?</b><br/>An API key is your credential for accessing AI services, like a key that allows your application to call AI capabilities.</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click to enter key page</p></div>'
       },
       createKey: {
         title: '➕ Create New Key',
@@ -6660,7 +6597,7 @@ export default {
       },
       keyGroup: {
         title: '🎯 Select Group',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Select the service group assigned by the administrator.</p><p style="padding: 8px 12px; background: #eff6ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px;"><b>📌 Group Info:</b><br/>Different groups may have different service quality and billing rates, choose according to your needs.</p></div>',
+        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">Select the service group assigned by the administrator.</p><p style="padding: 8px 12px; background: #eff7ff; border-left: 3px solid #339CFF; border-radius: 4px; font-size: 13px;"><b>📌 Group Info:</b><br/>Different groups may have different service quality and billing rates, choose according to your needs.</p></div>',
         nextBtn: 'Next'
       },
       keySubmit: {

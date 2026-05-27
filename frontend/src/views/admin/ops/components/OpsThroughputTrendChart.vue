@@ -45,8 +45,8 @@ watch(
 
 const isDarkMode = computed(() => document.documentElement.classList.contains('dark'))
 const colors = computed(() => ({
-  blue: '#3b82f6',
-  blueAlpha: '#3b82f620',
+  blue: '#339CFF',
+  blueAlpha: '#339CFF20',
   green: '#10b981',
   greenAlpha: '#10b98120',
   grid: isDarkMode.value ? '#374151' : '#f3f4f6',
