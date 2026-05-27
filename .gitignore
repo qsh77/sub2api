@@ -1,5 +1,9 @@
 docs/claude-relay-service/
-.codex
+.codex/*
+!.codex/skills/
+.codex/skills/*
+!.codex/skills/sub2api-sync/
+!.codex/skills/sub2api-sync/**
 
 # ===================
 # Go 后端
@@ -138,7 +142,6 @@ docs/*
 !docs/PAYMENT_CN.md
 !docs/ADMIN_PAYMENT_INTEGRATION_API.md
 .serena/
-.codex/
 frontend/coverage/
 aicodex
 output/
