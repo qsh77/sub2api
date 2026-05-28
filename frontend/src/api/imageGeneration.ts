@@ -38,7 +38,7 @@ export interface ImageModelCandidate {
   } | null
 }
 
-export type ImageKeyUnavailableReason = 'missing_group' | 'unsupported_platform' | 'image_disabled'
+export type ImageKeyUnavailableReason = 'missing_group' | 'unsupported_platform' | 'image_disabled' | 'group_inactive'
 
 export interface ImageKeyGroupState {
   platform?: string
@@ -76,6 +76,9 @@ export function resolveKeyImageState(group: ImageKeyGroupState | null | undefine
   }
   if (group.allow_image_generation === false) {
     return { allowed: false, reason: 'image_disabled' }
+  }
+  if (group.status && group.status !== 'active') {
+    return { allowed: false, reason: 'group_inactive' }
   }
   return { allowed: true, reason: null }
 }

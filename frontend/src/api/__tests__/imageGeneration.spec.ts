@@ -146,5 +146,13 @@ describe('image generation helpers', () => {
       allowed: false,
       reason: 'image_disabled',
     })
+    expect(resolveKeyImageState({
+      platform: 'openai',
+      allow_image_generation: true,
+      status: 'suspended',
+    })).toEqual({
+      allowed: false,
+      reason: 'group_inactive',
+    })
   })
 })
