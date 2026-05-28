@@ -1071,9 +1071,9 @@ export default {
     emptyDescription: '输入提示词并生成图片后，结果会显示在这里。',
     noGroup: '无分组',
     admin: {
-      title: '图片生成诊断',
-      description: '按分组和 API 密钥测试图片生成',
-      subtitle: '选择路由参数，执行管理员图片生成检查。',
+      title: '图片生成',
+      description: '对话式生成、编辑和管理图片',
+      subtitle: '对话式生成、编辑和管理图片',
       group: '分组',
       selectGroup: '请选择分组',
       apiKey: 'API 密钥',

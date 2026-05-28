@@ -97,6 +97,18 @@ func RegisterAdminRoutes(
 
 		// 邀请返利（专属用户管理）
 		registerAffiliateRoutes(admin, h)
+
+		registerImageWorkspaceRoutes(admin, h)
+	}
+}
+
+func registerImageWorkspaceRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	images := admin.Group("/images")
+	{
+		images.GET("/projects", h.Admin.ImageWorkspace.ListProjects)
+		images.GET("/projects/:id", h.Admin.ImageWorkspace.GetProject)
+		images.GET("/versions/:id/file", h.Admin.ImageWorkspace.GetVersionFile)
+		images.DELETE("/projects/:id", h.Admin.ImageWorkspace.DeleteProject)
 	}
 }
 

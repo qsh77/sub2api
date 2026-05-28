@@ -77,6 +77,16 @@ func RegisterUserRoutes(
 			channels.GET("/available", h.AvailableChannel.List)
 		}
 
+		images := authenticated.Group("/images")
+		{
+			images.GET("/projects", h.ImageWorkspace.ListProjects)
+			images.GET("/projects/:id", h.ImageWorkspace.GetProject)
+			images.POST("/upload", h.ImageWorkspace.Upload)
+			images.GET("/versions/:id/file", h.ImageWorkspace.GetVersionFile)
+			images.DELETE("/projects/:id", h.ImageWorkspace.DeleteProject)
+			images.DELETE("/versions/:id", h.ImageWorkspace.DeleteVersion)
+		}
+
 		// 使用记录
 		usage := authenticated.Group("/usage")
 		{

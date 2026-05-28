@@ -791,6 +791,115 @@ var (
 			},
 		},
 	}
+	// ImageProjectsColumns holds the columns for the "image_projects" table.
+	ImageProjectsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "title", Type: field.TypeString, Size: 160, Default: ""},
+		{Name: "cover_version_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "status", Type: field.TypeString, Size: 20, Default: "active"},
+		{Name: "user_id", Type: field.TypeInt64},
+	}
+	// ImageProjectsTable holds the schema information for the "image_projects" table.
+	ImageProjectsTable = &schema.Table{
+		Name:       "image_projects",
+		Columns:    ImageProjectsColumns,
+		PrimaryKey: []*schema.Column{ImageProjectsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "image_projects_users_image_projects",
+				Columns:    []*schema.Column{ImageProjectsColumns[7]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "imageproject_user_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ImageProjectsColumns[7], ImageProjectsColumns[1]},
+			},
+			{
+				Name:    "imageproject_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ImageProjectsColumns[6], ImageProjectsColumns[1]},
+			},
+			{
+				Name:    "imageproject_deleted_at",
+				Unique:  false,
+				Columns: []*schema.Column{ImageProjectsColumns[3]},
+			},
+		},
+	}
+	// ImageVersionsColumns holds the columns for the "image_versions" table.
+	ImageVersionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "parent_version_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "source_version_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "mode", Type: field.TypeString, Size: 20},
+		{Name: "prompt", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "revised_prompt", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "model", Type: field.TypeString, Size: 100, Default: ""},
+		{Name: "size", Type: field.TypeString, Size: 32, Default: ""},
+		{Name: "mime_type", Type: field.TypeString, Size: 64},
+		{Name: "file_path", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "file_size_bytes", Type: field.TypeInt64, Default: 0},
+		{Name: "sha256", Type: field.TypeString, Size: 64, Default: ""},
+		{Name: "width", Type: field.TypeInt, Default: 0},
+		{Name: "height", Type: field.TypeInt, Default: 0},
+		{Name: "mask_file_path", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "mask_mime_type", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "api_key_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "usage_log_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "project_id", Type: field.TypeInt64},
+		{Name: "user_id", Type: field.TypeInt64},
+	}
+	// ImageVersionsTable holds the schema information for the "image_versions" table.
+	ImageVersionsTable = &schema.Table{
+		Name:       "image_versions",
+		Columns:    ImageVersionsColumns,
+		PrimaryKey: []*schema.Column{ImageVersionsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "image_versions_image_projects_versions",
+				Columns:    []*schema.Column{ImageVersionsColumns[20]},
+				RefColumns: []*schema.Column{ImageProjectsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "image_versions_users_image_versions",
+				Columns:    []*schema.Column{ImageVersionsColumns[21]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "imageversion_project_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ImageVersionsColumns[20], ImageVersionsColumns[18]},
+			},
+			{
+				Name:    "imageversion_user_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ImageVersionsColumns[21], ImageVersionsColumns[18]},
+			},
+			{
+				Name:    "imageversion_parent_version_id",
+				Unique:  false,
+				Columns: []*schema.Column{ImageVersionsColumns[1]},
+			},
+			{
+				Name:    "imageversion_deleted_at",
+				Unique:  false,
+				Columns: []*schema.Column{ImageVersionsColumns[19]},
+			},
+		},
+	}
 	// PaymentAuditLogsColumns holds the columns for the "payment_audit_logs" table.
 	PaymentAuditLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -1719,6 +1828,8 @@ var (
 		GroupsTable,
 		IdempotencyRecordsTable,
 		IdentityAdoptionDecisionsTable,
+		ImageProjectsTable,
+		ImageVersionsTable,
 		PaymentAuditLogsTable,
 		PaymentOrdersTable,
 		PaymentProviderInstancesTable,
@@ -1800,6 +1911,15 @@ func init() {
 	IdentityAdoptionDecisionsTable.ForeignKeys[1].RefTable = PendingAuthSessionsTable
 	IdentityAdoptionDecisionsTable.Annotation = &entsql.Annotation{
 		Table: "identity_adoption_decisions",
+	}
+	ImageProjectsTable.ForeignKeys[0].RefTable = UsersTable
+	ImageProjectsTable.Annotation = &entsql.Annotation{
+		Table: "image_projects",
+	}
+	ImageVersionsTable.ForeignKeys[0].RefTable = ImageProjectsTable
+	ImageVersionsTable.ForeignKeys[1].RefTable = UsersTable
+	ImageVersionsTable.Annotation = &entsql.Annotation{
+		Table: "image_versions",
 	}
 	PaymentAuditLogsTable.Annotation = &entsql.Annotation{
 		Table: "payment_audit_logs",

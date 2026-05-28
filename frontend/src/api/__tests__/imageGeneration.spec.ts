@@ -120,7 +120,7 @@ describe('image generation helpers', () => {
       { name: 'custom-image-model', pricing: null },
     ])).toEqual(['gpt-image-1', 'custom-image-model'])
 
-    expect(filterImageModels([])).toEqual(['gpt-image-1', 'gpt-image-1.5', 'gpt-image-2'])
+    expect(filterImageModels([])).toEqual(['gpt-image-2', 'gpt-image-1.5', 'gpt-image-1'])
   })
 
   it('resolves key image availability from group fields', () => {

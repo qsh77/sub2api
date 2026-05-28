@@ -4,41 +4,42 @@ import { flushPromises, mount } from '@vue/test-utils'
 import ImageGenerationView from '../ImageGenerationView.vue'
 import type { AdminGroup, ApiKey } from '@/types'
 
-const { getGroups, getGroupApiKeys, generateImage, showError } = vi.hoisted(() => ({
+const { getGroups, getGroupApiKeys, listProjects, getProject, generateImage, uploadImageVersion, showError, showSuccess } = vi.hoisted(() => ({
   getGroups: vi.fn(),
   getGroupApiKeys: vi.fn(),
+  listProjects: vi.fn(),
+  getProject: vi.fn(),
   generateImage: vi.fn(),
-  showError: vi.fn()
+  uploadImageVersion: vi.fn(),
+  showError: vi.fn(),
+  showSuccess: vi.fn(),
 }))
 
 vi.mock('@/api/admin', () => ({
   adminAPI: {
     groups: {
       getAll: getGroups,
-      getGroupApiKeys
-    }
-  }
+      getGroupApiKeys,
+    },
+    images: {
+      list: listProjects,
+      get: getProject,
+    },
+  },
 }))
 
 vi.mock('@/api/imageGeneration', async () => {
   const actual = await vi.importActual<typeof import('@/api/imageGeneration')>('@/api/imageGeneration')
   return {
     ...actual,
-    generateImage
+    generateImage,
+    uploadImageVersion,
   }
 })
 
 vi.mock('@/stores/app', () => ({
-  useAppStore: () => ({ showError })
+  useAppStore: () => ({ showError, showSuccess }),
 }))
-
-vi.mock('vue-i18n', async () => {
-  const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
-  return {
-    ...actual,
-    useI18n: () => ({ t: (key: string) => key })
-  }
-})
 
 const AppLayoutStub = { template: '<main><slot /></main>' }
 const SelectStub = {
@@ -47,7 +48,7 @@ const SelectStub = {
   methods: {
     update(event: Event) {
       this.$emit('update:modelValue', (event.target as HTMLSelectElement).value)
-    }
+    },
   },
   template: `
     <select :value="modelValue" :disabled="disabled" @change="update">
@@ -56,17 +57,15 @@ const SelectStub = {
         {{ option.label }}
       </option>
     </select>
-  `
+  `,
 }
 
 function deferred<T>() {
   let resolve!: (value: T) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+  const promise = new Promise<T>((promiseResolve) => {
     resolve = promiseResolve
-    reject = promiseReject
   })
-  return { promise, resolve, reject }
+  return { promise, resolve }
 }
 
 const baseGroup: AdminGroup = {
@@ -99,9 +98,9 @@ const baseGroup: AdminGroup = {
   mcp_xml_inject: false,
   models_list_config: {
     enabled: true,
-    models: ['gpt-image-1', 'gpt-image-2']
+    models: ['gpt-image-2', 'gpt-image-1'],
   },
-  sort_order: 0
+  sort_order: 0,
 }
 
 function group(overrides: Partial<AdminGroup> = {}): AdminGroup {
@@ -137,27 +136,43 @@ function apiKey(overrides: Partial<ApiKey> = {}): ApiKey {
     reset_5h_at: null,
     reset_1d_at: null,
     reset_7d_at: null,
-    ...overrides
+    ...overrides,
   }
+}
+
+const savedDetail = {
+  project: { id: 9, user_id: 1, title: 'a diagnostic control panel', cover_version_id: 9, status: 'active', created_at: '', updated_at: '' },
+  versions: [{
+    id: 9,
+    project_id: 9,
+    user_id: 1,
+    mode: 'generation' as const,
+    prompt: 'a diagnostic control panel',
+    model: 'gpt-image-2',
+    size: '1024x1024',
+    mime_type: 'image/png',
+    file_size_bytes: 5,
+    sha256: '',
+    width: 1,
+    height: 1,
+    created_at: '',
+  }],
 }
 
 async function mountView(groups = [baseGroup], keys = [apiKey()]) {
   getGroups.mockResolvedValue(groups)
-  getGroupApiKeys.mockResolvedValue({
-    items: keys,
-    total: keys.length,
-    page: 1,
-    page_size: 50,
-    pages: 1
-  })
+  getGroupApiKeys.mockResolvedValue({ items: keys, total: keys.length, page: 1, page_size: 50, pages: 1 })
+  listProjects.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 50, pages: 1 })
+  getProject.mockResolvedValue(savedDetail)
+  uploadImageVersion.mockResolvedValue(savedDetail)
 
   const wrapper = mount(ImageGenerationView, {
     global: {
       stubs: {
         AppLayout: AppLayoutStub,
-        Select: SelectStub
-      }
-    }
+        Select: SelectStub,
+      },
+    },
   })
   await flushPromises()
   return wrapper
@@ -167,8 +182,12 @@ describe('admin ImageGenerationView', () => {
   beforeEach(() => {
     getGroups.mockReset()
     getGroupApiKeys.mockReset()
+    listProjects.mockReset()
+    getProject.mockReset()
     generateImage.mockReset()
+    uploadImageVersion.mockReset()
     showError.mockReset()
+    showSuccess.mockReset()
   })
 
   it('loads OpenAI image-enabled groups and active group API keys', async () => {
@@ -178,6 +197,7 @@ describe('admin ImageGenerationView', () => {
     expect(getGroupApiKeys).toHaveBeenCalledWith(1, 1, 50)
     expect(wrapper.text()).toContain('Image Group')
     expect(wrapper.text()).toContain('Active Key')
+    expect(wrapper.text()).toContain('对话式生成、编辑和管理图片')
   })
 
   it('filters out inactive keys and disabled groups', async () => {
@@ -185,12 +205,12 @@ describe('admin ImageGenerationView', () => {
       [
         group({ id: 1, name: 'Enabled Group' }),
         group({ id: 2, name: 'Disabled Group', allow_image_generation: false }),
-        group({ id: 3, name: 'Inactive Group', status: 'inactive' })
+        group({ id: 3, name: 'Inactive Group', status: 'inactive' }),
       ],
       [
         apiKey({ id: 1, name: 'Active Key', key: 'sk-active' }),
-        apiKey({ id: 2, name: 'Inactive Key', key: 'sk-inactive', status: 'inactive' })
-      ]
+        apiKey({ id: 2, name: 'Inactive Key', key: 'sk-inactive', status: 'inactive' }),
+      ],
     )
 
     expect(wrapper.text()).toContain('Enabled Group')
@@ -205,136 +225,67 @@ describe('admin ImageGenerationView', () => {
     const secondLoad = deferred<unknown>()
     getGroups.mockResolvedValue([
       group({ id: 1, name: 'First Group' }),
-      group({ id: 2, name: 'Second Group', models_list_config: { enabled: true, models: ['gpt-image-2'] } })
+      group({ id: 2, name: 'Second Group', models_list_config: { enabled: true, models: ['gpt-image-2'] } }),
     ])
     getGroupApiKeys
       .mockReturnValueOnce(firstLoad.promise)
       .mockReturnValueOnce(secondLoad.promise)
+    listProjects.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 50, pages: 1 })
 
     const wrapper = mount(ImageGenerationView, {
       global: {
         stubs: {
           AppLayout: AppLayoutStub,
-          Select: SelectStub
-        }
-      }
+          Select: SelectStub,
+        },
+      },
     })
     await flushPromises()
 
     await wrapper.findAll('select')[0].setValue('2')
     expect(getGroupApiKeys).toHaveBeenLastCalledWith(2, 1, 50)
 
-    secondLoad.resolve({
-      items: [apiKey({ id: 2, name: 'Second Key', key: 'sk-second', group_id: 2 })],
-      total: 1,
-      page: 1,
-      page_size: 50,
-      pages: 1
-    })
+    secondLoad.resolve({ items: [apiKey({ id: 2, name: 'Second Key', key: 'sk-second', group_id: 2 })], total: 1, page: 1, page_size: 50, pages: 1 })
     await flushPromises()
-    firstLoad.resolve({
-      items: [apiKey({ id: 1, name: 'First Key', key: 'sk-first', group_id: 1 })],
-      total: 1,
-      page: 1,
-      page_size: 50,
-      pages: 1
-    })
+    firstLoad.resolve({ items: [apiKey({ id: 1, name: 'First Key', key: 'sk-first', group_id: 1 })], total: 1, page: 1, page_size: 50, pages: 1 })
     await flushPromises()
 
     expect(wrapper.text()).toContain('Second Key')
     expect(wrapper.text()).not.toContain('First Key')
   })
 
-  it('generates with selected API key, renders returned image, and shows diagnostics', async () => {
+  it('generates with selected API key and renders the saved image message', async () => {
     generateImage.mockResolvedValue({
       images: [{ url: 'data:image/png;base64,aGVsbG8=' }],
-      raw: {}
+      raw: {},
     })
     const wrapper = await mountView()
 
-    await wrapper.find('textarea').setValue('  a diagnostic control panel  ')
+    await wrapper.find('textarea').setValue('a diagnostic control panel')
     await wrapper.find('[data-testid="admin-generate-image"]').trigger('click')
     await flushPromises()
 
     expect(generateImage).toHaveBeenCalledWith(
       'sk-active',
       {
-        model: 'gpt-image-1',
+        model: 'gpt-image-2',
         prompt: 'a diagnostic control panel',
         size: '1024x1024',
         n: 1,
-        response_format: 'b64_json'
+        response_format: 'b64_json',
       },
-      { signal: expect.any(AbortSignal) }
+      { signal: expect.any(AbortSignal) },
     )
-    expect(wrapper.find('img[alt="admin-generated-image-1"]').attributes('src')).toBe('data:image/png;base64,aGVsbG8=')
-    expect(wrapper.find('a[download="admin-generated-image-1.png"]').attributes('href')).toBe('data:image/png;base64,aGVsbG8=')
-    expect(wrapper.text()).toContain('imageGeneration.admin.diagnostics')
-    expect(wrapper.text()).toContain('gpt-image-1')
-    expect(wrapper.text()).toContain('Image Group')
-    expect(wrapper.text()).toContain('Active Key')
-    expect(wrapper.text()).toMatch(/\d+ ms/)
-  })
-
-  it('keeps generation diagnostics tied to the submitted selection snapshot', async () => {
-    const generation = deferred<{
-      images: Array<{ url: string }>
-      raw: Record<string, never>
-    }>()
-    getGroupApiKeys
-      .mockResolvedValueOnce({
-        items: [apiKey({ id: 1, name: 'Original Key', key: 'sk-original', group_id: 1 })],
-        total: 1,
-        page: 1,
-        page_size: 50,
-        pages: 1
-      })
-      .mockResolvedValueOnce({
-        items: [apiKey({ id: 2, name: 'Changed Key', key: 'sk-changed', group_id: 2 })],
-        total: 1,
-        page: 1,
-        page_size: 50,
-        pages: 1
-      })
-    generateImage.mockReturnValue(generation.promise)
-    const wrapper = await mountView([
-      group({ id: 1, name: 'Original Group' }),
-      group({ id: 2, name: 'Changed Group', models_list_config: { enabled: true, models: ['gpt-image-2'] } })
-    ])
-
-    await wrapper.find('textarea').setValue('snapshot request')
-    await wrapper.find('[data-testid="admin-generate-image"]').trigger('click')
-    wrapper.findAllComponents(SelectStub)[0].vm.$emit('update:modelValue', 2)
-    await flushPromises()
-
-    generation.resolve({
-      images: [{ url: 'data:image/png;base64,c25hcA==' }],
-      raw: {}
-    })
-    await flushPromises()
-
-    expect(generateImage).toHaveBeenCalledWith(
-      'sk-original',
-      expect.objectContaining({
-        model: 'gpt-image-1',
-        prompt: 'snapshot request'
-      }),
-      { signal: expect.any(AbortSignal) }
-    )
-    const diagnostics = wrapper.get('[data-testid="admin-image-diagnostics"]').text()
-    expect(diagnostics).toContain('Original Group')
-    expect(diagnostics).toContain('Original Key')
-    expect(diagnostics).toContain('gpt-image-1')
-    expect(diagnostics).not.toContain('Changed Group')
-    expect(diagnostics).not.toContain('Changed Key')
-    expect(diagnostics).not.toContain('gpt-image-2')
+    expect(uploadImageVersion).toHaveBeenCalled()
+    expect(wrapper.find('img[alt="generated-image-9"]').attributes('src')).toBe('/api/v1/admin/images/versions/9/file')
+    expect(showSuccess).toHaveBeenCalledWith('图片已保存')
   })
 
   it('shows raw error text and calls showError when generation fails', async () => {
     generateImage.mockRejectedValue(new Error('provider exploded'))
     const wrapper = await mountView()
 
-    await wrapper.find('textarea').setValue('broken request')
+    await wrapper.find('textarea').setValue('a failing prompt')
     await wrapper.find('[data-testid="admin-generate-image"]').trigger('click')
     await flushPromises()
 

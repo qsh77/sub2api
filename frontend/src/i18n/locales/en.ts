@@ -1067,9 +1067,9 @@ export default {
     emptyDescription: 'Enter a prompt and generate an image to see results.',
     noGroup: 'No group',
     admin: {
-      title: 'Image Diagnostics',
-      description: 'Test image generation across groups and API keys',
-      subtitle: 'Run admin image generation checks with selected routing inputs.',
+      title: 'Image Generation',
+      description: 'Generate, edit, and manage images conversationally',
+      subtitle: 'Generate, edit, and manage images conversationally',
       group: 'Group',
       selectGroup: 'Select a group',
       apiKey: 'API Key',

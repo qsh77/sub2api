@@ -189,6 +189,30 @@ func (f IdentityAdoptionDecisionFunc) Mutate(ctx context.Context, m ent.Mutation
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.IdentityAdoptionDecisionMutation", m)
 }
 
+// The ImageProjectFunc type is an adapter to allow the use of ordinary
+// function as ImageProject mutator.
+type ImageProjectFunc func(context.Context, *ent.ImageProjectMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ImageProjectFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ImageProjectMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ImageProjectMutation", m)
+}
+
+// The ImageVersionFunc type is an adapter to allow the use of ordinary
+// function as ImageVersion mutator.
+type ImageVersionFunc func(context.Context, *ent.ImageVersionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ImageVersionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ImageVersionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ImageVersionMutation", m)
+}
+
 // The PaymentAuditLogFunc type is an adapter to allow the use of ordinary
 // function as PaymentAuditLog mutator.
 type PaymentAuditLogFunc func(context.Context, *ent.PaymentAuditLogMutation) (ent.Value, error)

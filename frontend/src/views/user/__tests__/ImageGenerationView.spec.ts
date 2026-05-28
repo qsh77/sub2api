@@ -3,10 +3,13 @@ import { flushPromises, mount } from '@vue/test-utils'
 
 import ImageGenerationView from '../ImageGenerationView.vue'
 
-const { list, getAvailable, generateImage, showError, showSuccess } = vi.hoisted(() => ({
+const { list, getAvailable, generateImage, listImageProjects, getImageProject, uploadImageVersion, showError, showSuccess } = vi.hoisted(() => ({
   list: vi.fn(),
   getAvailable: vi.fn(),
   generateImage: vi.fn(),
+  listImageProjects: vi.fn(),
+  getImageProject: vi.fn(),
+  uploadImageVersion: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
 }))
@@ -21,6 +24,9 @@ vi.mock('@/api/imageGeneration', async () => {
   return {
     ...actual,
     generateImage,
+    listImageProjects,
+    getImageProject,
+    uploadImageVersion,
   }
 })
 
@@ -120,6 +126,26 @@ function channels() {
 async function mountView(keys = [apiKey()]) {
   list.mockResolvedValue({ items: keys, total: keys.length, page: 1, page_size: 100, pages: 1 })
   getAvailable.mockResolvedValue(channels())
+  listImageProjects.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 50, pages: 1 })
+  getImageProject.mockResolvedValue({ project: { id: 1, user_id: 1, title: 'Saved', status: 'active', created_at: '', updated_at: '' }, versions: [] })
+  uploadImageVersion.mockResolvedValue({
+    project: { id: 1, user_id: 1, title: 'Saved', cover_version_id: 1, status: 'active', created_at: '', updated_at: '' },
+    versions: [{
+      id: 1,
+      project_id: 1,
+      user_id: 1,
+      mode: 'generation',
+      prompt: 'a compact control room',
+      model: 'gpt-image-1',
+      size: '1024x1024',
+      mime_type: 'image/png',
+      file_size_bytes: 5,
+      sha256: '',
+      width: 1,
+      height: 1,
+      created_at: '',
+    }],
+  })
 
   const wrapper = mount(ImageGenerationView, {
     global: {
@@ -138,6 +164,9 @@ describe('ImageGenerationView', () => {
     list.mockReset()
     getAvailable.mockReset()
     generateImage.mockReset()
+    listImageProjects.mockReset()
+    getImageProject.mockReset()
+    uploadImageVersion.mockReset()
     showError.mockReset()
     showSuccess.mockReset()
   })
@@ -150,8 +179,6 @@ describe('ImageGenerationView', () => {
 
     expect(wrapper.text()).toContain('Enabled key')
     expect(wrapper.text()).not.toContain('Inactive key')
-    expect(wrapper.text()).toContain('OpenAI Images')
-    expect(wrapper.text()).toContain('openai')
     expect(list).toHaveBeenCalledWith(1, 100, { status: 'active' })
 
     await wrapper.find('textarea').setValue('a clean vector dashboard')
@@ -168,7 +195,7 @@ describe('ImageGenerationView', () => {
 
     await wrapper.find('textarea').setValue('a city at dusk')
 
-    expect(wrapper.text()).toContain('imageGeneration.errors.imageDisabled')
+    expect(wrapper.text()).toContain('当前分组未启用图片生成')
     expect(wrapper.find('[data-testid="generate-image"]').attributes('disabled')).toBeDefined()
   })
 
@@ -181,7 +208,7 @@ describe('ImageGenerationView', () => {
 
     await wrapper.find('textarea').setValue('a city at dawn')
 
-    expect(wrapper.text()).toContain('imageGeneration.errors.groupInactive')
+    expect(wrapper.text()).toContain('当前分组未启用')
     expect(wrapper.find('[data-testid="generate-image"]').attributes('disabled')).toBeDefined()
   })
 
@@ -207,8 +234,9 @@ describe('ImageGenerationView', () => {
       },
       { signal: expect.any(AbortSignal) },
     )
-    expect(wrapper.find('img[alt="generated-image-1"]').attributes('src')).toBe('data:image/png;base64,aGVsbG8=')
-    expect(wrapper.find('a[download="generated-image-1.png"]').attributes('href')).toBe('data:image/png;base64,aGVsbG8=')
-    expect(showSuccess).toHaveBeenCalledWith('imageGeneration.success')
+    expect(uploadImageVersion).toHaveBeenCalled()
+    expect(wrapper.find('img[alt="generated-image-1"]').attributes('src')).toBe('/api/v1/images/versions/1/file')
+    expect(wrapper.find('a[download="image-1.png"]').attributes('href')).toBe('/api/v1/images/versions/1/file')
+    expect(showSuccess).toHaveBeenCalledWith('图片已保存')
   })
 })

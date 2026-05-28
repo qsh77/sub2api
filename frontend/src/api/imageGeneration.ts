@@ -1,4 +1,7 @@
+import { apiClient } from './client'
+
 export type ImageSizeOption = '1024x1024' | '1536x1536' | '2048x2048'
+export type ImageWorkspaceMode = 'generation' | 'edit' | 'mask_edit' | 'upload'
 
 export interface ImageGenerationRequest {
   model: string
@@ -31,6 +34,56 @@ export interface NormalizedImageGenerationResult {
   raw: ImageGenerationResponse
 }
 
+export interface ImageWorkspaceProject {
+  id: number
+  user_id: number
+  title: string
+  cover_version_id?: number | null
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ImageWorkspaceVersion {
+  id: number
+  project_id: number
+  user_id: number
+  parent_version_id?: number | null
+  source_version_id?: number | null
+  mode: ImageWorkspaceMode
+  prompt: string
+  revised_prompt?: string | null
+  model: string
+  size: string
+  mime_type: string
+  file_size_bytes: number
+  sha256: string
+  width: number
+  height: number
+  mask_mime_type?: string | null
+  api_key_id?: number | null
+  usage_log_id?: number | null
+  created_at: string
+}
+
+export interface ImageWorkspaceProjectSummary extends ImageWorkspaceProject {
+  version_count: number
+  cover_version?: ImageWorkspaceVersion | null
+}
+
+export interface ImageWorkspaceProjectDetail {
+  project: ImageWorkspaceProject
+  versions: ImageWorkspaceVersion[]
+}
+
+export interface ImageWorkspaceListResponse {
+  items: ImageWorkspaceProjectSummary[]
+  total: number
+  page: number
+  page_size: number
+  pages: number
+}
+
 export interface ImageModelCandidate {
   name: string
   pricing?: {
@@ -51,7 +104,7 @@ export const IMAGE_SIZE_OPTIONS = [
   { label: '2K', value: '1536x1536' },
   { label: '4K', value: '2048x2048' },
 ] as const
-export const DEFAULT_IMAGE_MODELS = ['gpt-image-1', 'gpt-image-1.5', 'gpt-image-2'] as const
+export const DEFAULT_IMAGE_MODELS = ['gpt-image-2', 'gpt-image-1.5', 'gpt-image-1'] as const
 
 interface GenerateImageOptions {
   signal?: AbortSignal
@@ -122,6 +175,81 @@ export async function generateImage(
   }
 
   return normalizeImageGenerationResponse(data as ImageGenerationResponse)
+}
+
+export async function editImage(
+  apiKey: string,
+  payload: {
+    model: string
+    prompt: string
+    image: Blob
+    mask?: Blob | null
+    size?: ImageSizeOption | string
+    n?: number
+    response_format?: 'url' | 'b64_json'
+  },
+  options: GenerateImageOptions = {}
+): Promise<NormalizedImageGenerationResult> {
+  const form = new FormData()
+  form.append('model', payload.model)
+  form.append('prompt', payload.prompt)
+  form.append('image', payload.image, 'source.png')
+  if (payload.mask) form.append('mask', payload.mask, 'mask.png')
+  if (payload.size) form.append('size', payload.size)
+  if (payload.n) form.append('n', String(payload.n))
+  form.append('response_format', payload.response_format || 'b64_json')
+
+  const response = await fetch('/v1/images/edits', {
+    method: 'POST',
+    headers: { 'x-api-key': apiKey },
+    body: form,
+    signal: options.signal,
+  })
+  const data = await parseJson(response)
+  if (!response.ok) {
+    throw new Error(readErrorMessage(data) || `Image edit failed with status ${response.status}`)
+  }
+  return normalizeImageGenerationResponse(data as ImageGenerationResponse)
+}
+
+export async function listImageProjects(params: Record<string, unknown> = {}): Promise<ImageWorkspaceListResponse> {
+  const { data } = await apiClient.get('/images/projects', { params })
+  return data as ImageWorkspaceListResponse
+}
+
+export async function getImageProject(id: number): Promise<ImageWorkspaceProjectDetail> {
+  const { data } = await apiClient.get(`/images/projects/${id}`)
+  return data as ImageWorkspaceProjectDetail
+}
+
+export async function uploadImageVersion(form: FormData): Promise<ImageWorkspaceProjectDetail> {
+  const { data } = await apiClient.post('/images/upload', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data as ImageWorkspaceProjectDetail
+}
+
+export async function deleteImageProject(id: number): Promise<void> {
+  await apiClient.delete(`/images/projects/${id}`)
+}
+
+export async function deleteImageVersion(id: number): Promise<void> {
+  await apiClient.delete(`/images/versions/${id}`)
+}
+
+export function imageVersionFileUrl(id: number, admin = false): string {
+  return `/api/v1/${admin ? 'admin/images' : 'images'}/versions/${id}/file`
+}
+
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const [header, encoded] = dataUrl.split(',', 2)
+  const mimeType = header.match(/^data:([^;]+);base64$/)?.[1] || 'image/png'
+  const binary = atob(encoded || '')
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return new Blob([bytes], { type: mimeType })
 }
 
 export function imageToDownloadHref(image: Pick<GeneratedImage, 'url'>): string {

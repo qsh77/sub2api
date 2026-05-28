@@ -17,6 +17,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
 	"github.com/Wei-Shaw/sub2api/ent/group"
+	"github.com/Wei-Shaw/sub2api/ent/imageproject"
+	"github.com/Wei-Shaw/sub2api/ent/imageversion"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
@@ -48,6 +50,8 @@ type UserQuery struct {
 	withPaymentOrders         *PaymentOrderQuery
 	withAuthIdentities        *AuthIdentityQuery
 	withPendingAuthSessions   *PendingAuthSessionQuery
+	withImageProjects         *ImageProjectQuery
+	withImageVersions         *ImageVersionQuery
 	withUserAllowedGroups     *UserAllowedGroupQuery
 	modifiers                 []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
@@ -350,6 +354,50 @@ func (_q *UserQuery) QueryPendingAuthSessions() *PendingAuthSessionQuery {
 	return query
 }
 
+// QueryImageProjects chains the current query on the "image_projects" edge.
+func (_q *UserQuery) QueryImageProjects() *ImageProjectQuery {
+	query := (&ImageProjectClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(imageproject.Table, imageproject.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.ImageProjectsTable, user.ImageProjectsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryImageVersions chains the current query on the "image_versions" edge.
+func (_q *UserQuery) QueryImageVersions() *ImageVersionQuery {
+	query := (&ImageVersionClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(imageversion.Table, imageversion.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.ImageVersionsTable, user.ImageVersionsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
 // QueryUserAllowedGroups chains the current query on the "user_allowed_groups" edge.
 func (_q *UserQuery) QueryUserAllowedGroups() *UserAllowedGroupQuery {
 	query := (&UserAllowedGroupClient{config: _q.config}).Query()
@@ -576,6 +624,8 @@ func (_q *UserQuery) Clone() *UserQuery {
 		withPaymentOrders:         _q.withPaymentOrders.Clone(),
 		withAuthIdentities:        _q.withAuthIdentities.Clone(),
 		withPendingAuthSessions:   _q.withPendingAuthSessions.Clone(),
+		withImageProjects:         _q.withImageProjects.Clone(),
+		withImageVersions:         _q.withImageVersions.Clone(),
 		withUserAllowedGroups:     _q.withUserAllowedGroups.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
@@ -715,6 +765,28 @@ func (_q *UserQuery) WithPendingAuthSessions(opts ...func(*PendingAuthSessionQue
 	return _q
 }
 
+// WithImageProjects tells the query-builder to eager-load the nodes that are connected to
+// the "image_projects" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *UserQuery) WithImageProjects(opts ...func(*ImageProjectQuery)) *UserQuery {
+	query := (&ImageProjectClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withImageProjects = query
+	return _q
+}
+
+// WithImageVersions tells the query-builder to eager-load the nodes that are connected to
+// the "image_versions" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *UserQuery) WithImageVersions(opts ...func(*ImageVersionQuery)) *UserQuery {
+	query := (&ImageVersionClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withImageVersions = query
+	return _q
+}
+
 // WithUserAllowedGroups tells the query-builder to eager-load the nodes that are connected to
 // the "user_allowed_groups" edge. The optional arguments are used to configure the query builder of the edge.
 func (_q *UserQuery) WithUserAllowedGroups(opts ...func(*UserAllowedGroupQuery)) *UserQuery {
@@ -804,7 +876,7 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 	var (
 		nodes       = []*User{}
 		_spec       = _q.querySpec()
-		loadedTypes = [13]bool{
+		loadedTypes = [15]bool{
 			_q.withAPIKeys != nil,
 			_q.withRedeemCodes != nil,
 			_q.withSubscriptions != nil,
@@ -817,6 +889,8 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 			_q.withPaymentOrders != nil,
 			_q.withAuthIdentities != nil,
 			_q.withPendingAuthSessions != nil,
+			_q.withImageProjects != nil,
+			_q.withImageVersions != nil,
 			_q.withUserAllowedGroups != nil,
 		}
 	)
@@ -926,6 +1000,20 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 			func(n *User, e *PendingAuthSession) {
 				n.Edges.PendingAuthSessions = append(n.Edges.PendingAuthSessions, e)
 			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withImageProjects; query != nil {
+		if err := _q.loadImageProjects(ctx, query, nodes,
+			func(n *User) { n.Edges.ImageProjects = []*ImageProject{} },
+			func(n *User, e *ImageProject) { n.Edges.ImageProjects = append(n.Edges.ImageProjects, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withImageVersions; query != nil {
+		if err := _q.loadImageVersions(ctx, query, nodes,
+			func(n *User) { n.Edges.ImageVersions = []*ImageVersion{} },
+			func(n *User, e *ImageVersion) { n.Edges.ImageVersions = append(n.Edges.ImageVersions, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -1334,6 +1422,66 @@ func (_q *UserQuery) loadPendingAuthSessions(ctx context.Context, query *Pending
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "target_user_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *UserQuery) loadImageProjects(ctx context.Context, query *ImageProjectQuery, nodes []*User, init func(*User), assign func(*User, *ImageProject)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*User)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(imageproject.FieldUserID)
+	}
+	query.Where(predicate.ImageProject(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(user.ImageProjectsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.UserID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "user_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *UserQuery) loadImageVersions(ctx context.Context, query *ImageVersionQuery, nodes []*User, init func(*User), assign func(*User, *ImageVersion)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*User)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(imageversion.FieldUserID)
+	}
+	query.Where(predicate.ImageVersion(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(user.ImageVersionsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.UserID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "user_id" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
 	}

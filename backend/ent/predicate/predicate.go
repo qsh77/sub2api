@@ -51,6 +51,12 @@ type IdempotencyRecord func(*sql.Selector)
 // IdentityAdoptionDecision is the predicate function for identityadoptiondecision builders.
 type IdentityAdoptionDecision func(*sql.Selector)
 
+// ImageProject is the predicate function for imageproject builders.
+type ImageProject func(*sql.Selector)
+
+// ImageVersion is the predicate function for imageversion builders.
+type ImageVersion func(*sql.Selector)
+
 // PaymentAuditLog is the predicate function for paymentauditlog builders.
 type PaymentAuditLog func(*sql.Selector)
 

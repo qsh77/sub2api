@@ -1616,6 +1616,52 @@ func HasPendingAuthSessionsWith(preds ...predicate.PendingAuthSession) predicate
 	})
 }
 
+// HasImageProjects applies the HasEdge predicate on the "image_projects" edge.
+func HasImageProjects() predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ImageProjectsTable, ImageProjectsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasImageProjectsWith applies the HasEdge predicate on the "image_projects" edge with a given conditions (other predicates).
+func HasImageProjectsWith(preds ...predicate.ImageProject) predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := newImageProjectsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasImageVersions applies the HasEdge predicate on the "image_versions" edge.
+func HasImageVersions() predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ImageVersionsTable, ImageVersionsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasImageVersionsWith applies the HasEdge predicate on the "image_versions" edge with a given conditions (other predicates).
+func HasImageVersionsWith(preds ...predicate.ImageVersion) predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := newImageVersionsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasUserAllowedGroups applies the HasEdge predicate on the "user_allowed_groups" edge.
 func HasUserAllowedGroups() predicate.User {
 	return predicate.User(func(s *sql.Selector) {
