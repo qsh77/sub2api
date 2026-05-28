@@ -42,9 +42,9 @@ export function normalizeImageGenerationResponse(response: ImageGenerationRespon
   return {
     raw: response,
     images: (response.data || []).map((item) => {
-      const mimeType = item.mime_type
+      const mimeType = item.b64_json ? item.mime_type || 'image/png' : item.mime_type
       return {
-        url: item.b64_json ? `data:${mimeType || 'image/png'};base64,${item.b64_json}` : item.url || '',
+        url: item.b64_json ? `data:${mimeType};base64,${item.b64_json}` : item.url || '',
         mimeType,
         revisedPrompt: item.revised_prompt,
       }

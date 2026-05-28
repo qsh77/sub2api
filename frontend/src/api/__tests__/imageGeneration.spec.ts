@@ -66,6 +66,20 @@ describe('imageGeneration API', () => {
     ])
   })
 
+  it('defaults missing b64_json mime type to image/png', () => {
+    const response: ImageGenerationResponse = {
+      data: [{ b64_json: 'aGVsbG8=' }],
+    }
+
+    expect(normalizeImageGenerationResponse(response).images).toEqual([
+      {
+        url: 'data:image/png;base64,aGVsbG8=',
+        mimeType: 'image/png',
+        revisedPrompt: undefined,
+      },
+    ])
+  })
+
   it('extracts OpenAI-style error messages', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: false,
