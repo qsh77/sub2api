@@ -20,7 +20,7 @@
               <Select
                 v-model="selectedGroupId"
                 :options="groupOptions"
-                :disabled="loadingGroups || groups.length === 0"
+                :disabled="generating || loadingGroups || groups.length === 0"
                 :placeholder="t('imageGeneration.admin.selectGroup')"
               />
             </label>
@@ -32,7 +32,7 @@
               <Select
                 v-model="selectedKeyValue"
                 :options="keyOptions"
-                :disabled="loadingKeys || activeKeys.length === 0"
+                :disabled="generating || loadingKeys || activeKeys.length === 0"
                 :placeholder="t('imageGeneration.admin.selectApiKey')"
               />
             </label>
@@ -41,7 +41,7 @@
               <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
                 {{ t('imageGeneration.model') }}
               </span>
-              <Select v-model="model" :options="modelOptions" />
+              <Select v-model="model" :options="modelOptions" :disabled="generating" />
             </label>
 
             <div class="grid gap-4 sm:grid-cols-2">
@@ -49,13 +49,13 @@
                 <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
                   {{ t('imageGeneration.size') }}
                 </span>
-                <Select v-model="size" :options="sizeOptions" />
+                <Select v-model="size" :options="sizeOptions" :disabled="generating" />
               </label>
               <label class="block">
                 <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
                   {{ t('imageGeneration.count') }}
                 </span>
-                <input v-model.number="count" type="number" min="1" max="4" class="input" />
+                <input v-model.number="count" type="number" min="1" max="4" class="input" :disabled="generating" />
               </label>
             </div>
 
@@ -68,6 +68,7 @@
                 rows="7"
                 class="input min-h-40 resize-y"
                 :placeholder="t('imageGeneration.promptPlaceholder')"
+                :disabled="generating"
               />
             </label>
 
@@ -117,7 +118,11 @@
               </figure>
             </div>
 
-            <div v-if="diagnostics" class="rounded-lg bg-gray-50 p-4 text-sm dark:bg-dark-900/60">
+            <div
+              v-if="diagnostics"
+              data-testid="admin-image-diagnostics"
+              class="rounded-lg bg-gray-50 p-4 text-sm dark:bg-dark-900/60"
+            >
               <h2 class="font-semibold text-gray-900 dark:text-white">
                 {{ t('imageGeneration.admin.diagnostics') }}
               </h2>
@@ -189,6 +194,7 @@ const loadingGroups = ref(false)
 const loadingKeys = ref(false)
 const generating = ref(false)
 let controller: AbortController | null = null
+let keyLoadRequestId = 0
 
 const selectedGroup = computed(() => groups.value.find((item) => item.id === Number(selectedGroupId.value)) || null)
 const selectedKey = computed(() => activeKeys.value.find((item) => item.key === selectedKeyValue.value) || null)
@@ -243,24 +249,39 @@ async function loadGroups() {
 }
 
 async function loadKeys(groupId: number) {
+  const requestId = ++keyLoadRequestId
   activeKeys.value = []
   if (!groupId) return
 
   loadingKeys.value = true
   try {
     const result = await adminAPI.groups.getGroupApiKeys(groupId, 1, 50)
+    if (requestId !== keyLoadRequestId || groupId !== Number(selectedGroupId.value)) return
     activeKeys.value = ((result.items || []) as ApiKey[]).filter((item) => item.status === 'active')
   } catch (err: unknown) {
+    if (requestId !== keyLoadRequestId || groupId !== Number(selectedGroupId.value)) return
     const message = readErrorText(err)
     errorText.value = message
     appStore.showError(message)
   } finally {
-    loadingKeys.value = false
+    if (requestId === keyLoadRequestId && groupId === Number(selectedGroupId.value)) {
+      loadingKeys.value = false
+    }
   }
 }
 
 async function submit() {
   if (!canGenerate.value || !selectedKey.value || !selectedGroup.value) return
+  const snapshot = {
+    key: selectedKey.value.key,
+    keyName: selectedKey.value.name,
+    groupId: selectedGroup.value.id,
+    groupName: selectedGroup.value.name,
+    model: model.value,
+    size: size.value,
+    n: count.value,
+    prompt: trimmedPrompt.value
+  }
 
   controller?.abort()
   controller = new AbortController()
@@ -270,21 +291,21 @@ async function submit() {
   const startedAt = Date.now()
   try {
     const result = await generateImage(
-      selectedKey.value.key,
+      snapshot.key,
       {
-        model: model.value,
-        prompt: trimmedPrompt.value,
-        size: size.value,
-        n: count.value,
+        model: snapshot.model,
+        prompt: snapshot.prompt,
+        size: snapshot.size,
+        n: snapshot.n,
         response_format: 'b64_json'
       },
       { signal: controller.signal }
     )
     images.value = result.images
     diagnostics.value = {
-      model: model.value,
-      groupName: selectedGroup.value.name,
-      keyName: selectedKey.value.name,
+      model: snapshot.model,
+      groupName: snapshot.groupName,
+      keyName: snapshot.keyName,
       durationMs: Math.max(0, Date.now() - startedAt)
     }
   } catch (err: unknown) {

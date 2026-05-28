@@ -59,6 +59,16 @@ const SelectStub = {
   `
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve
+    reject = promiseReject
+  })
+  return { promise, resolve, reject }
+}
+
 const baseGroup: AdminGroup = {
   id: 1,
   name: 'Image Group',
@@ -190,6 +200,51 @@ describe('admin ImageGenerationView', () => {
     expect(wrapper.text()).not.toContain('Inactive Key')
   })
 
+  it('ignores stale group API key loads', async () => {
+    const firstLoad = deferred<unknown>()
+    const secondLoad = deferred<unknown>()
+    getGroups.mockResolvedValue([
+      group({ id: 1, name: 'First Group' }),
+      group({ id: 2, name: 'Second Group', models_list_config: { enabled: true, models: ['gpt-image-2'] } })
+    ])
+    getGroupApiKeys
+      .mockReturnValueOnce(firstLoad.promise)
+      .mockReturnValueOnce(secondLoad.promise)
+
+    const wrapper = mount(ImageGenerationView, {
+      global: {
+        stubs: {
+          AppLayout: AppLayoutStub,
+          Select: SelectStub
+        }
+      }
+    })
+    await flushPromises()
+
+    await wrapper.findAll('select')[0].setValue('2')
+    expect(getGroupApiKeys).toHaveBeenLastCalledWith(2, 1, 50)
+
+    secondLoad.resolve({
+      items: [apiKey({ id: 2, name: 'Second Key', key: 'sk-second', group_id: 2 })],
+      total: 1,
+      page: 1,
+      page_size: 50,
+      pages: 1
+    })
+    await flushPromises()
+    firstLoad.resolve({
+      items: [apiKey({ id: 1, name: 'First Key', key: 'sk-first', group_id: 1 })],
+      total: 1,
+      page: 1,
+      page_size: 50,
+      pages: 1
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Second Key')
+    expect(wrapper.text()).not.toContain('First Key')
+  })
+
   it('generates with selected API key, renders returned image, and shows diagnostics', async () => {
     generateImage.mockResolvedValue({
       images: [{ url: 'data:image/png;base64,aGVsbG8=' }],
@@ -219,6 +274,60 @@ describe('admin ImageGenerationView', () => {
     expect(wrapper.text()).toContain('Image Group')
     expect(wrapper.text()).toContain('Active Key')
     expect(wrapper.text()).toMatch(/\d+ ms/)
+  })
+
+  it('keeps generation diagnostics tied to the submitted selection snapshot', async () => {
+    const generation = deferred<{
+      images: Array<{ url: string }>
+      raw: Record<string, never>
+    }>()
+    getGroupApiKeys
+      .mockResolvedValueOnce({
+        items: [apiKey({ id: 1, name: 'Original Key', key: 'sk-original', group_id: 1 })],
+        total: 1,
+        page: 1,
+        page_size: 50,
+        pages: 1
+      })
+      .mockResolvedValueOnce({
+        items: [apiKey({ id: 2, name: 'Changed Key', key: 'sk-changed', group_id: 2 })],
+        total: 1,
+        page: 1,
+        page_size: 50,
+        pages: 1
+      })
+    generateImage.mockReturnValue(generation.promise)
+    const wrapper = await mountView([
+      group({ id: 1, name: 'Original Group' }),
+      group({ id: 2, name: 'Changed Group', models_list_config: { enabled: true, models: ['gpt-image-2'] } })
+    ])
+
+    await wrapper.find('textarea').setValue('snapshot request')
+    await wrapper.find('[data-testid="admin-generate-image"]').trigger('click')
+    wrapper.findAllComponents(SelectStub)[0].vm.$emit('update:modelValue', 2)
+    await flushPromises()
+
+    generation.resolve({
+      images: [{ url: 'data:image/png;base64,c25hcA==' }],
+      raw: {}
+    })
+    await flushPromises()
+
+    expect(generateImage).toHaveBeenCalledWith(
+      'sk-original',
+      expect.objectContaining({
+        model: 'gpt-image-1',
+        prompt: 'snapshot request'
+      }),
+      { signal: expect.any(AbortSignal) }
+    )
+    const diagnostics = wrapper.get('[data-testid="admin-image-diagnostics"]').text()
+    expect(diagnostics).toContain('Original Group')
+    expect(diagnostics).toContain('Original Key')
+    expect(diagnostics).toContain('gpt-image-1')
+    expect(diagnostics).not.toContain('Changed Group')
+    expect(diagnostics).not.toContain('Changed Key')
+    expect(diagnostics).not.toContain('gpt-image-2')
   })
 
   it('shows raw error text and calls showError when generation fails', async () => {
