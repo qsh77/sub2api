@@ -46,7 +46,11 @@ export interface ImageKeyGroupState {
   allow_image_generation?: boolean
 }
 
-export const IMAGE_SIZE_OPTIONS: ImageSizeOption[] = ['1024x1024', '1536x1536', '2048x2048']
+export const IMAGE_SIZE_OPTIONS = [
+  { label: '1K', value: '1024x1024' },
+  { label: '2K', value: '1536x1536' },
+  { label: '4K', value: '2048x2048' },
+] as const
 export const DEFAULT_IMAGE_MODELS = ['gpt-image-1', 'gpt-image-1.5', 'gpt-image-2'] as const
 
 interface GenerateImageOptions {

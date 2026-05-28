@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   filterImageModels,
   generateImage,
+  IMAGE_SIZE_OPTIONS,
   normalizeImageGenerationResponse,
   imageToDownloadHref,
   resolveKeyImageState,
@@ -107,6 +108,11 @@ describe('imageGeneration API', () => {
 })
 
 describe('image generation helpers', () => {
+  it('exposes image size labels and values', () => {
+    expect(IMAGE_SIZE_OPTIONS.map((item) => item.value)).toEqual(['1024x1024', '1536x1536', '2048x2048'])
+    expect(IMAGE_SIZE_OPTIONS.map((item) => item.label)).toEqual(['1K', '2K', '4K'])
+  })
+
   it('filters image-capable models and falls back to defaults', () => {
     expect(filterImageModels([
       { name: 'gpt-5.4', pricing: { billing_mode: 'token' } },
