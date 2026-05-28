@@ -54,6 +54,7 @@ pnpm-debug.log*
 # ===================
 .env
 .env.local
+.env.*
 .env.*.local
 *.env
 !.env.example
@@ -88,6 +89,7 @@ temp/
 *.temp
 *.log
 *.bak
+.envrc
 .cache/
 .dev/
 .serena/
@@ -112,6 +114,9 @@ backend/data/
 data/
 postgres_data/
 redis_data/
+*.db
+*.sqlite
+*.sqlite3
 migration/*.dump
 migration/*.tar.gz
 
@@ -121,6 +126,10 @@ migration/*.tar.gz
 backend/config.yaml
 deploy/config.yaml
 backend/.installed
+*.key
+*.pem
+*.p12
+*.pfx
 
 # ===================
 # 其他
@@ -134,6 +143,7 @@ scripts
 code-reviews/
 AGENTS.md
 agents.md
+.superpowers/
 backend/cmd/server/server
 deploy/docker-compose.override.yml
 .gocache/
