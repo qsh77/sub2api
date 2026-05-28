@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  filterImageModels,
   generateImage,
   normalizeImageGenerationResponse,
   imageToDownloadHref,
+  resolveKeyImageState,
   type ImageGenerationResponse,
 } from '../imageGeneration'
 
@@ -101,5 +103,48 @@ describe('imageGeneration API', () => {
   it('builds download href for normalized images', () => {
     expect(imageToDownloadHref({ url: 'data:image/png;base64,aGVsbG8=' })).toBe('data:image/png;base64,aGVsbG8=')
     expect(imageToDownloadHref({ url: 'https://example.com/image.png' })).toBe('https://example.com/image.png')
+  })
+})
+
+describe('image generation helpers', () => {
+  it('filters image-capable models and falls back to defaults', () => {
+    expect(filterImageModels([
+      { name: 'gpt-5.4', pricing: { billing_mode: 'token' } },
+      { name: 'gpt-image-1', pricing: { billing_mode: 'image' } },
+      { name: 'custom-image-model', pricing: null },
+    ])).toEqual(['gpt-image-1', 'custom-image-model'])
+
+    expect(filterImageModels([])).toEqual(['gpt-image-1', 'gpt-image-1.5', 'gpt-image-2'])
+  })
+
+  it('resolves key image availability from group fields', () => {
+    expect(resolveKeyImageState(null)).toEqual({
+      allowed: false,
+      reason: 'missing_group',
+    })
+    expect(resolveKeyImageState({
+      platform: 'openai',
+      allow_image_generation: true,
+      status: 'active',
+    })).toEqual({
+      allowed: true,
+      reason: null,
+    })
+    expect(resolveKeyImageState({
+      platform: 'anthropic',
+      allow_image_generation: true,
+      status: 'active',
+    })).toEqual({
+      allowed: false,
+      reason: 'unsupported_platform',
+    })
+    expect(resolveKeyImageState({
+      platform: 'openai',
+      allow_image_generation: false,
+      status: 'active',
+    })).toEqual({
+      allowed: false,
+      reason: 'image_disabled',
+    })
   })
 })

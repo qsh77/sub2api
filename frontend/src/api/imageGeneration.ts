@@ -31,11 +31,53 @@ export interface NormalizedImageGenerationResult {
   raw: ImageGenerationResponse
 }
 
+export interface ImageModelCandidate {
+  name: string
+  pricing?: {
+    billing_mode?: string
+  } | null
+}
+
+export type ImageKeyUnavailableReason = 'missing_group' | 'unsupported_platform' | 'image_disabled'
+
+export interface ImageKeyGroupState {
+  platform?: string
+  status?: string
+  allow_image_generation?: boolean
+}
+
 export const IMAGE_SIZE_OPTIONS: ImageSizeOption[] = ['1024x1024', '1536x1536', '2048x2048']
-export const DEFAULT_IMAGE_MODELS = ['gpt-image-1'] as const
+export const DEFAULT_IMAGE_MODELS = ['gpt-image-1', 'gpt-image-1.5', 'gpt-image-2'] as const
 
 interface GenerateImageOptions {
   signal?: AbortSignal
+}
+
+export function filterImageModels(models: ImageModelCandidate[]): string[] {
+  const imageModels = models
+    .filter((model) => {
+      const name = model.name.toLowerCase()
+      return model.pricing?.billing_mode === 'image' || name.includes('image')
+    })
+    .map((model) => model.name)
+
+  return imageModels.length > 0 ? Array.from(new Set(imageModels)) : [...DEFAULT_IMAGE_MODELS]
+}
+
+export function resolveKeyImageState(group: ImageKeyGroupState | null | undefined): {
+  allowed: boolean
+  reason: ImageKeyUnavailableReason | null
+} {
+  if (!group) {
+    return { allowed: false, reason: 'missing_group' }
+  }
+  if (group.platform !== 'openai') {
+    return { allowed: false, reason: 'unsupported_platform' }
+  }
+  if (group.allow_image_generation === false) {
+    return { allowed: false, reason: 'image_disabled' }
+  }
+  return { allowed: true, reason: null }
 }
 
 export function normalizeImageGenerationResponse(response: ImageGenerationResponse): NormalizedImageGenerationResult {
