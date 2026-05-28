@@ -152,6 +152,7 @@ describe('ImageGenerationView', () => {
     expect(wrapper.text()).not.toContain('Inactive key')
     expect(wrapper.text()).toContain('OpenAI Images')
     expect(wrapper.text()).toContain('openai')
+    expect(list).toHaveBeenCalledWith(1, 100, { status: 'active' })
 
     await wrapper.find('textarea').setValue('a clean vector dashboard')
 

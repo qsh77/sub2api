@@ -196,7 +196,7 @@ async function loadData() {
   loading.value = true
   try {
     const [keys, channels] = await Promise.all([
-      keysAPI.list(1, 100),
+      keysAPI.list(1, 100, { status: 'active' }),
       userChannelsAPI.getAvailable(),
     ])
     activeKeys.value = keys.items.filter((item) => item.status === 'active')
