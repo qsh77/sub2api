@@ -361,6 +361,7 @@ export default {
     groups: 'Groups',
     channels: 'Channels',
     availableChannels: 'Available Channels',
+    imageGeneration: 'Image Generation',
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
     proxies: 'Proxies',
@@ -1037,6 +1038,51 @@ export default {
       intervals: 'Tiered Pricing',
       unitPerMillion: '/ 1M tokens',
       unitPerRequest: '/ request'
+    }
+  },
+
+  imageGeneration: {
+    title: 'Image Generation',
+    description: 'Generate images with your available image models',
+    subtitle: 'Create images from prompts using enabled API keys.',
+    apiKey: 'API Key',
+    selectApiKey: 'Select an API key',
+    group: 'Group',
+    platform: 'Platform',
+    model: 'Model',
+    size: 'Size',
+    count: 'Count',
+    prompt: 'Prompt',
+    promptPlaceholder: 'Describe the image you want to generate...',
+    generate: 'Generate',
+    generating: 'Generating...',
+    results: 'Results',
+    download: 'Download',
+    success: 'Image generated',
+    failed: 'Image generation failed',
+    emptyKeys: 'No image-capable API keys',
+    createKey: 'Create Key',
+    emptyResults: 'Generated images will appear here',
+    emptyTitle: 'No images yet',
+    emptyDescription: 'Enter a prompt and generate an image to see results.',
+    noGroup: 'No group',
+    admin: {
+      title: 'Image Diagnostics',
+      description: 'Test image generation across groups and API keys',
+      subtitle: 'Run admin image generation checks with selected routing inputs.',
+      group: 'Group',
+      selectGroup: 'Select a group',
+      apiKey: 'API Key',
+      selectApiKey: 'Select an API key',
+      diagnostics: 'Diagnostics',
+      duration: 'Duration'
+    },
+    errors: {
+      noActiveKey: 'No active image-capable API key is available.',
+      missingGroup: 'This API key has no available group.',
+      unsupportedPlatform: 'This platform does not support image generation.',
+      imageDisabled: 'Image generation is disabled for this group.',
+      groupInactive: 'This group is inactive.'
     }
   },
 

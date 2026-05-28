@@ -361,6 +361,7 @@ export default {
     groups: '分组管理',
     channels: '渠道管理',
     availableChannels: '可用渠道',
+    imageGeneration: '图片生成',
     subscriptions: '订阅管理',
     accounts: '账号管理',
     proxies: 'IP管理',
@@ -1041,6 +1042,51 @@ export default {
       intervals: '阶梯定价',
       unitPerMillion: '/ 1M token',
       unitPerRequest: '/ 次'
+    }
+  },
+
+  imageGeneration: {
+    title: '图片生成',
+    description: '使用可用图片模型生成图片',
+    subtitle: '选择已启用的 API 密钥，通过提示词生成图片。',
+    apiKey: 'API 密钥',
+    selectApiKey: '请选择 API 密钥',
+    group: '分组',
+    platform: '平台',
+    model: '模型',
+    size: '尺寸',
+    count: '数量',
+    prompt: '提示词',
+    promptPlaceholder: '描述你想生成的图片...',
+    generate: '生成',
+    generating: '生成中...',
+    results: '结果',
+    download: '下载',
+    success: '图片生成成功',
+    failed: '图片生成失败',
+    emptyKeys: '暂无可生成图片的 API 密钥',
+    createKey: '创建密钥',
+    emptyResults: '生成的图片会显示在这里',
+    emptyTitle: '暂无图片',
+    emptyDescription: '输入提示词并生成图片后，结果会显示在这里。',
+    noGroup: '无分组',
+    admin: {
+      title: '图片生成诊断',
+      description: '按分组和 API 密钥测试图片生成',
+      subtitle: '选择路由参数，执行管理员图片生成检查。',
+      group: '分组',
+      selectGroup: '请选择分组',
+      apiKey: 'API 密钥',
+      selectApiKey: '请选择 API 密钥',
+      diagnostics: '诊断信息',
+      duration: '耗时'
+    },
+    errors: {
+      noActiveKey: '暂无可用的图片生成 API 密钥。',
+      missingGroup: '此 API 密钥没有可用分组。',
+      unsupportedPlatform: '此平台不支持图片生成。',
+      imageDisabled: '此分组未启用图片生成。',
+      groupInactive: '此分组未启用。'
     }
   },
 
