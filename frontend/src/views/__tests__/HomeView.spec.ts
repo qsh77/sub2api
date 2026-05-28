@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
 
 import HomeView from '../HomeView.vue'
 
@@ -107,6 +108,14 @@ describe('HomeView', () => {
 
     expect(authState.checkAuth).toHaveBeenCalledOnce()
     wrapper.unmount()
+  })
+
+  it('lets the default landing surface fill the viewport', () => {
+    const source = readFileSync('src/views/HomeView.vue', 'utf8')
+
+    expect(source).toMatch(/\.homepage\s*{[^}]*padding:\s*0;/s)
+    expect(source).toMatch(/\.hero-shell\s*{[^}]*width:\s*100%;/s)
+    expect(source).not.toMatch(/\.hero-shell\s*{[^}]*max-width:/s)
   })
 
   it('keeps URL home_content rendered as an iframe', () => {

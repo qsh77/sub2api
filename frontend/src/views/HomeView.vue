@@ -237,25 +237,26 @@ onMounted(() => {
 
 <style scoped>
 .homepage {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   overflow: hidden;
   background: #f8fafc;
   color: #0f172a;
-  padding: 32px;
+  padding: 0;
 }
 
 .hero-shell {
   position: relative;
-  max-width: 1200px;
-  min-height: calc(100vh - 112px);
-  margin: 0 auto;
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
   overflow: hidden;
-  border: 1px solid #d8eaff;
-  border-radius: 18px;
+  border-bottom: 1px solid #d8eaff;
   background: linear-gradient(120deg, #f8fbff 0%, #ffffff 34%, #eef7ff 66%, #f8fbff 100%);
   background-size: 180% 180%;
   animation: surface-flow 11s ease-in-out infinite;
-  padding: 26px;
+  padding: 34px;
 }
 
 .surface-orb,
@@ -299,6 +300,10 @@ onMounted(() => {
 .metric-grid {
   position: relative;
   z-index: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin-right: auto;
+  margin-left: auto;
 }
 
 .hero-header {
@@ -765,7 +770,7 @@ onMounted(() => {
 
 @media (max-width: 820px) {
   .homepage {
-    padding: 16px;
+    padding: 0;
   }
 
   .hero-shell {
