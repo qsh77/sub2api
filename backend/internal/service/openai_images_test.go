@@ -403,14 +403,20 @@ func TestResolveOpenAIImageBytes_PrefersInlineBase64(t *testing.T) {
 	require.Equal(t, []byte("ABC"), data)
 }
 
-func TestAccountSupportsOpenAIImageCapability_OAuthSupportsNative(t *testing.T) {
-	account := &Account{
+func TestAccountSupportsOpenAIImageCapability_AllowsOAuthAndAPIKey(t *testing.T) {
+	oauthAccount := &Account{
 		Platform: PlatformOpenAI,
 		Type:     AccountTypeOAuth,
 	}
+	apiKeyAccount := &Account{
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+	}
 
-	require.True(t, account.SupportsOpenAIImageCapability(OpenAIImagesCapabilityBasic))
-	require.True(t, account.SupportsOpenAIImageCapability(OpenAIImagesCapabilityNative))
+	require.True(t, oauthAccount.SupportsOpenAIImageCapability(OpenAIImagesCapabilityBasic))
+	require.True(t, oauthAccount.SupportsOpenAIImageCapability(OpenAIImagesCapabilityNative))
+	require.True(t, apiKeyAccount.SupportsOpenAIImageCapability(OpenAIImagesCapabilityBasic))
+	require.True(t, apiKeyAccount.SupportsOpenAIImageCapability(OpenAIImagesCapabilityNative))
 }
 
 func TestBuildOpenAIImagesURL_HandlesVersionedBaseURL(t *testing.T) {
@@ -1183,6 +1189,21 @@ func TestBuildOpenAIImagesResponsesRequest_PassesThroughNForMultiImageModels(t *
 	require.Equal(t, int64(2), gjson.GetBytes(body, "tools.0.n").Int())
 	require.Equal(t, "gpt-image-2", gjson.GetBytes(body, "tools.0.model").String())
 	require.Equal(t, "draw a cat", gjson.GetBytes(body, "input.0.content.0.text").String())
+}
+
+func TestBuildOpenAIImagesResponsesRequest_UsesToolChoiceWithoutLegacyAction(t *testing.T) {
+	parsed := &OpenAIImagesRequest{
+		Endpoint: openAIImagesGenerationsEndpoint,
+		Model:    "gpt-image-1",
+		Prompt:   "draw a cat",
+		N:        1,
+	}
+
+	body, err := buildOpenAIImagesResponsesRequest(parsed, "gpt-image-1")
+	require.NoError(t, err)
+	require.Equal(t, "image_generation", gjson.GetBytes(body, "tools.0.type").String())
+	require.Equal(t, "image_generation", gjson.GetBytes(body, "tool_choice.type").String())
+	require.False(t, gjson.GetBytes(body, "tools.0.action").Exists())
 }
 
 func TestBuildOpenAIImagesResponsesRequest_DoesNotPassNForDallE3(t *testing.T) {
