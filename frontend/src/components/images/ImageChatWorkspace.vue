@@ -1,44 +1,51 @@
 <template>
-  <AppLayout>
+  <AppLayout main-class="p-0">
     <div class="flex min-h-[calc(100vh-4rem)] flex-col bg-white dark:bg-dark-950">
       <div class="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pt-5 sm:px-6 lg:px-8">
-        <header class="sticky top-16 z-20 -mx-4 border-b border-gray-100 bg-white/95 px-4 pb-4 backdrop-blur dark:border-dark-800 dark:bg-dark-950/95 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ title }}</h1>
-              <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">{{ subtitle }}</p>
-            </div>
-            <div class="flex items-center gap-2">
-              <button type="button" class="btn btn-secondary" :disabled="loading" @click="startNewProject">
+        <header class="sticky top-16 z-20 -mx-4 border-b border-gray-100 bg-white/95 px-4 py-4 backdrop-blur dark:border-dark-800 dark:bg-dark-950/95 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+          <div class="grid items-end gap-2 md:grid-cols-2 xl:grid-cols-[minmax(120px,0.8fr)_minmax(140px,0.9fr)_minmax(150px,0.9fr)_88px_auto]">
+            <label v-if="isAdmin" class="image-control-field">
+              <span class="image-control-label">分组</span>
+              <Select
+                v-model="selectedGroupId"
+                class="image-control-select"
+                :options="groupOptions"
+                :disabled="loading || generating || groups.length === 0"
+                placeholder="选择分组"
+              />
+            </label>
+            <label class="image-control-field">
+              <span class="image-control-label">密钥</span>
+              <Select
+                v-model="selectedKeyValue"
+                class="image-control-select"
+                :options="keyOptions"
+                :disabled="loading || generating || activeKeys.length === 0"
+                placeholder="选择 API 密钥"
+              />
+            </label>
+            <label class="image-control-field">
+              <span class="image-control-label">模型</span>
+              <Select v-model="model" class="image-control-select" :options="modelOptions" :disabled="generating" />
+            </label>
+            <label class="image-control-field">
+              <span class="image-control-label">尺寸</span>
+              <Select v-model="size" class="image-control-select" :options="sizeOptions" :disabled="generating" />
+            </label>
+            <div class="image-control-field">
+              <span class="image-control-label">会话</span>
+              <button type="button" class="btn btn-secondary h-9 px-3 text-sm lg:justify-self-end" :disabled="loading" @click="startNewProject">
                 新对话
               </button>
             </div>
           </div>
 
-          <div class="mt-4 grid gap-3 lg:grid-cols-[minmax(150px,1fr)_minmax(160px,1fr)_minmax(160px,1fr)_110px]">
-            <Select
-              v-if="isAdmin"
-              v-model="selectedGroupId"
-              :options="groupOptions"
-              :disabled="loading || generating || groups.length === 0"
-              placeholder="选择分组"
-            />
-            <Select
-              v-model="selectedKeyValue"
-              :options="keyOptions"
-              :disabled="loading || generating || activeKeys.length === 0"
-              placeholder="选择 API 密钥"
-            />
-            <Select v-model="model" :options="modelOptions" :disabled="generating" />
-            <Select v-model="size" :options="sizeOptions" :disabled="generating" />
-          </div>
-
-          <div class="mt-3 flex flex-wrap items-center gap-2">
+          <div class="mt-2 flex flex-wrap items-center gap-1.5">
             <button
               v-for="project in projects"
               :key="project.id"
               type="button"
-              class="rounded-full border px-3 py-1 text-xs transition"
+              class="rounded-full border px-2.5 py-0.5 text-xs transition"
               :class="project.id === selectedProjectId ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900' : 'border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-dark-700 dark:text-dark-300 dark:hover:bg-dark-800'"
               @click="selectProject(project.id)"
             >
@@ -48,7 +55,7 @@
         </header>
 
         <main ref="chatEl" class="flex-1 space-y-8 py-8 pb-36">
-          <div v-if="chatItems.length === 0 && transientImages.length === 0 && !generating" class="flex min-h-[45vh] items-center justify-center text-center">
+          <div v-if="chatItems.length === 0 && pendingMessages.length === 0 && !generating" class="flex min-h-[45vh] items-center justify-center text-center">
             <div class="max-w-md">
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">想生成什么图片？</h2>
               <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">直接输入一句话。生成后可以继续点图片上的编辑或局部编辑。</p>
@@ -63,60 +70,82 @@
             </div>
 
             <div class="max-w-3xl">
-              <button type="button" class="mb-3 text-left text-sm text-gray-400" @click="selectedVersionId = item.version.id">
-                {{ item.thought }}
+              <button type="button" class="mb-3 block text-left text-sm text-gray-400" @click="toggleThought(versionThoughtKey(item.version))">
+                {{ versionThoughtLabel(item.version) }}
               </button>
-              <figure class="group relative inline-block overflow-hidden rounded-[2rem] bg-gray-100 shadow-sm dark:bg-dark-800">
+              <div v-if="expandedThoughtKey === versionThoughtKey(item.version)" class="mb-4 max-w-md rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm dark:border-dark-800 dark:bg-dark-900">
+                <div v-for="step in versionThoughtSteps(item.version)" :key="step.label" class="flex gap-3 py-1.5">
+                  <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-gray-400 dark:bg-dark-500"></span>
+                  <div>
+                    <p class="font-medium text-gray-800 dark:text-dark-100">{{ step.label }}</p>
+                    <p v-if="step.detail" class="mt-0.5 text-gray-500 dark:text-dark-400">{{ step.detail }}</p>
+                  </div>
+                </div>
+              </div>
+              <figure
+                class="group relative inline-block overflow-hidden rounded-[2rem] bg-gray-100 shadow-sm ring-offset-2 ring-offset-white dark:bg-dark-800 dark:ring-offset-dark-950"
+                :class="item.version.id === selectedVersionId ? 'ring-2 ring-gray-900 dark:ring-white' : ''"
+              >
                 <img
-                  :src="versionUrl(item.version)"
+                  :src="versionSrc(item.version)"
                   :alt="`generated-image-${item.version.id}`"
-                  class="max-h-[640px] w-full max-w-[720px] object-contain"
+                  class="max-h-[460px] w-full max-w-[560px] object-contain"
                   @click="selectVersionForFollowUp(item.version.id)"
                 />
                 <div class="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 p-4">
-                  <button type="button" class="rounded-full bg-black/55 px-4 py-2 text-sm font-medium text-white backdrop-blur" @click="selectVersionForFollowUp(item.version.id)">
+                  <button type="button" class="rounded-full bg-black/55 px-4 py-2 text-sm font-medium text-white backdrop-blur" @click.stop="selectVersionForFollowUp(item.version.id)">
                     继续改
                   </button>
                   <div class="flex items-center gap-2">
-                    <button type="button" class="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur" title="画局部区域" @click="openMaskEditor(item.version.id)">
-                      ◌
-                    </button>
-                    <a class="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur" title="下载" :href="versionUrl(item.version)" :download="`image-${item.version.id}.png`">
+                    <a class="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur" title="下载" :href="versionSrc(item.version)" :download="`image-${item.version.id}.png`" @click.stop>
                       ⇩
                     </a>
-                    <button type="button" class="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur" title="删除" @click="deleteVersion(item.version.id)">
-                      ×
-                    </button>
                   </div>
                 </div>
               </figure>
             </div>
           </template>
 
-          <div v-if="transientImages.length > 0" class="max-w-3xl">
-            <button type="button" class="mb-3 text-left text-sm text-gray-400">正在保存结果</button>
-            <div class="grid gap-4 sm:grid-cols-2">
-              <figure v-for="(image, index) in transientImages" :key="`${image.url}-${index}`" class="overflow-hidden rounded-[2rem] bg-gray-100 shadow-sm dark:bg-dark-800">
-                <img :src="image.url" :alt="`generated-image-${index + 1}`" class="aspect-square w-full object-cover" />
-              </figure>
+          <template v-for="message in pendingMessages" :key="message.id">
+            <div class="flex justify-end">
+              <div class="max-w-[82%] rounded-[1.5rem] bg-gray-900 px-5 py-3 text-sm leading-6 text-white shadow-sm">
+                {{ message.prompt }}
+              </div>
             </div>
-          </div>
-
-          <div v-if="generating" class="max-w-3xl">
-            <button type="button" class="text-left text-sm text-gray-400">Thought for {{ thinkingSeconds }}s ›</button>
-          </div>
+            <div class="max-w-3xl">
+              <button type="button" class="mb-3 block text-left text-sm text-gray-400" @click="toggleThought(pendingThoughtKey(message))">
+                {{ pendingLabel(message) }}
+              </button>
+              <div v-if="expandedThoughtKey === pendingThoughtKey(message)" class="mb-4 max-w-md rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm dark:border-dark-800 dark:bg-dark-900">
+                <div v-for="step in pendingThoughtSteps(message)" :key="step.label" class="flex gap-3 py-1.5">
+                  <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-gray-400 dark:bg-dark-500"></span>
+                  <div>
+                    <p class="font-medium text-gray-800 dark:text-dark-100">{{ step.label }}</p>
+                    <p v-if="step.detail" class="mt-0.5 text-gray-500 dark:text-dark-400">{{ step.detail }}</p>
+                  </div>
+                </div>
+              </div>
+              <div v-if="message.images.length > 0" class="grid gap-4 sm:grid-cols-2">
+                <figure v-for="(image, index) in message.images" :key="`${message.id}-${index}`" class="overflow-hidden rounded-[2rem] bg-gray-100 shadow-sm dark:bg-dark-800">
+                  <img :src="image.url" :alt="`pending-image-${index + 1}`" class="aspect-square w-full object-cover" />
+                </figure>
+              </div>
+            </div>
+          </template>
         </main>
       </div>
 
       <footer class="sticky bottom-0 z-30 border-t border-gray-100 bg-white/95 px-4 py-4 backdrop-blur dark:border-dark-800 dark:bg-dark-950/95">
         <div class="mx-auto w-full max-w-6xl">
-          <div v-if="maskEditorOpen && selectedVersion" class="mb-4 max-w-2xl rounded-2xl border border-gray-200 bg-white p-3 shadow-sm dark:border-dark-700 dark:bg-dark-900">
-            <MaskEditor :src="selectedImageUrl" @update:mask-blob="maskBlob = $event" />
-          </div>
-
           <p v-if="unavailableMessage" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ unavailableMessage }}</p>
           <p v-if="errorText" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ errorText }}</p>
           <p v-if="uploadFile" class="mb-3 text-sm text-gray-500 dark:text-dark-400">待上传：{{ uploadFile.name }}</p>
+          <p v-if="followUpLabel" class="mb-3 flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-dark-400">
+            <span>{{ followUpLabel }}</span>
+            <button type="button" class="font-medium text-gray-900 hover:underline dark:text-white" @click="clearFollowUp">
+              取消修改
+            </button>
+          </p>
 
           <div class="flex items-end gap-3 rounded-[2rem] border border-gray-200 bg-white p-3 shadow-lg dark:border-dark-700 dark:bg-dark-900">
             <input ref="fileInputEl" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="onUploadFile" />
@@ -152,13 +181,12 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Select from '@/components/common/Select.vue'
-import MaskEditor from '@/components/images/MaskEditor.vue'
 import { keysAPI, userChannelsAPI } from '@/api'
 import { adminAPI } from '@/api/admin'
 import {
   dataUrlToBlob,
-  deleteImageVersion,
   editImage,
+  fetchImageVersionBlob,
   filterImageModels,
   generateImage,
   getImageProject,
@@ -179,14 +207,33 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 import type { AdminGroup, ApiKey } from '@/types'
 
 type WorkspaceScope = 'user' | 'admin'
-type WorkspaceMode = 'generate' | 'edit' | 'mask' | 'upload'
+type WorkspaceMode = 'generate' | 'edit' | 'upload'
+type PendingMessageStatus = 'thinking' | 'saving'
+
+interface ThoughtStep {
+  label: string
+  detail?: string
+}
+
+interface ThoughtRecord {
+  seconds: number
+  steps: ThoughtStep[]
+}
+
+interface PendingMessage {
+  id: string
+  prompt: string
+  action: WorkspaceMode
+  status: PendingMessageStatus
+  seconds: number
+  images: GeneratedImage[]
+}
 
 const props = defineProps<{ scope: WorkspaceScope }>()
+const THOUGHT_STORAGE_KEY = 'sub2api:image-thoughts:v1'
 
 const appStore = useAppStore()
 const isAdmin = computed(() => props.scope === 'admin')
-const title = computed(() => isAdmin.value ? '图片生成' : '图片生成')
-const subtitle = computed(() => isAdmin.value ? '对话式生成、编辑和管理图片' : '像聊天一样生成、修改和保存图片')
 
 const groups = ref<AdminGroup[]>([])
 const activeKeys = ref<ApiKey[]>([])
@@ -197,22 +244,22 @@ const selectedProjectId = ref<number | null>(null)
 const selectedVersionId = ref<number | null>(null)
 const selectedGroupId = ref<string | number | boolean | null>(null)
 const selectedKeyValue = ref<string | number | boolean | null>(null)
-const maskEditorOpen = ref(false)
 const model = ref('')
 const size = ref<ImageSizeOption>(IMAGE_SIZE_OPTIONS[0].value)
 const prompt = ref('')
 const uploadFile = ref<File | null>(null)
-const maskBlob = ref<Blob | null>(null)
-const transientImages = ref<GeneratedImage[]>([])
+const pendingMessages = ref<PendingMessage[]>([])
+const versionObjectUrls = ref<Record<number, string>>({})
+const versionThoughts = ref<Record<number, ThoughtRecord>>(readStoredThoughts())
+const expandedThoughtKey = ref<string | null>(null)
 const errorText = ref('')
 const loading = ref(false)
 const generating = ref(false)
-const thinkingSeconds = ref(0)
 const chatEl = ref<HTMLElement | null>(null)
 const promptEl = ref<HTMLTextAreaElement | null>(null)
 const fileInputEl = ref<HTMLInputElement | null>(null)
 let controller: AbortController | null = null
-let thinkingTimer = 0
+let pendingTimer = 0
 let keyLoadRequestId = 0
 
 const selectedKey = computed(() => activeKeys.value.find((item) => item.key === selectedKeyValue.value) || null)
@@ -220,12 +267,14 @@ const selectedAdminGroup = computed<AdminGroup | null>(() => groups.value.find((
 const selectedGroup = computed(() => isAdmin.value ? selectedAdminGroup.value : selectedKey.value?.group || null)
 const keyState = computed(() => isAdmin.value ? { allowed: !!selectedKey.value, reason: null } : resolveKeyImageState(selectedGroup.value))
 const selectedVersion = computed<ImageWorkspaceVersion | null>(() => selectedDetail.value?.versions.find((item) => item.id === selectedVersionId.value) || null)
-const selectedImageUrl = computed(() => selectedVersion.value ? versionUrl(selectedVersion.value) : '')
 const trimmedPrompt = computed(() => prompt.value.trim())
 const groupOptions = computed(() => groups.value.map((item) => ({ value: item.id, label: item.name })))
 const keyOptions = computed(() => activeKeys.value.map((item) => ({ value: item.key, label: item.name })))
 const modelOptions = computed(() => currentModels.value.map((item) => ({ value: item, label: item })))
-const sizeOptions = computed(() => IMAGE_SIZE_OPTIONS.map((item) => ({ ...item })))
+const sizeOptions = computed(() => IMAGE_SIZE_OPTIONS.map((item) => ({
+  ...item,
+  label: imageSizeOptionLabel(item),
+})))
 const currentModels = computed<string[]>(() => {
   if (!isAdmin.value) return models.value
   const groupModels = selectedAdminGroup.value?.models_list_config?.models?.filter(Boolean) || []
@@ -234,11 +283,9 @@ const currentModels = computed<string[]>(() => {
 const chatItems = computed(() => (selectedDetail.value?.versions || []).map((version) => ({
   version,
   prompt: version.prompt || modeLabel(version.mode),
-  thought: version.mode === 'upload' ? 'Uploaded image' : 'Thought ›',
 })))
 const effectiveMode = computed<WorkspaceMode>(() => {
   if (uploadFile.value) return 'upload'
-  if (selectedVersion.value && maskBlob.value) return 'mask'
   if (selectedVersion.value) return 'edit'
   return 'generate'
 })
@@ -256,14 +303,16 @@ const canRun = computed(() => {
   if (effectiveMode.value === 'upload') return !!uploadFile.value
   if (!selectedKey.value || !keyState.value.allowed || !model.value || !trimmedPrompt.value) return false
   if (effectiveMode.value === 'edit') return !!selectedVersion.value
-  if (effectiveMode.value === 'mask') return !!selectedVersion.value && !!maskBlob.value
   return true
 })
 const composerPlaceholder = computed(() => {
   if (effectiveMode.value === 'edit') return '直接说要怎么修改这张图'
-  if (effectiveMode.value === 'mask') return '描述画出的局部区域要怎么改'
   if (effectiveMode.value === 'upload') return '上传后可补充一句说明'
   return '有问题，尽管问'
+})
+const followUpLabel = computed(() => {
+  if (!selectedVersion.value || uploadFile.value) return ''
+  return `正在修改：image-${selectedVersion.value.id}`
 })
 
 watch(groups, (items) => {
@@ -278,9 +327,13 @@ watch(activeKeys, (items) => {
 watch(currentModels, (items) => {
   if (!items.includes(model.value)) model.value = items[0] || ''
 }, { immediate: true })
-watch([chatItems, transientImages, generating], () => {
+watch([chatItems, pendingMessages, generating], () => {
   void nextTick(() => chatEl.value?.scrollIntoView?.({ block: 'end' }))
 })
+
+watch(selectedDetail, (detail) => {
+  void loadVersionImages(detail?.versions || [])
+}, { immediate: true })
 
 async function loadData() {
   loading.value = true
@@ -321,7 +374,9 @@ async function loadWorkspace() {
     ? await adminAPI.images.list({ page: 1, page_size: 50 })
     : await listImageProjects({ page: 1, page_size: 50 })
   projects.value = result.items
-  if (!selectedProjectId.value && projects.value[0]) selectedProjectId.value = projects.value[0].id
+  if (!selectedProjectId.value || !projects.value.some((project) => project.id === selectedProjectId.value)) {
+    selectedProjectId.value = preferredProjectId(projects.value)
+  }
   if (selectedProjectId.value) await selectProject(selectedProjectId.value)
 }
 
@@ -337,10 +392,9 @@ function startNewProject() {
   selectedProjectId.value = null
   selectedVersionId.value = null
   selectedDetail.value = null
-  transientImages.value = []
+  pendingMessages.value = []
+  expandedThoughtKey.value = null
   uploadFile.value = null
-  maskBlob.value = null
-  maskEditorOpen.value = false
   prompt.value = ''
   void nextTick(() => promptEl.value?.focus())
 }
@@ -348,59 +402,55 @@ function startNewProject() {
 function selectVersionForFollowUp(versionId: number) {
   selectedVersionId.value = versionId
   prompt.value = ''
-  maskBlob.value = null
-  maskEditorOpen.value = false
+  expandedThoughtKey.value = null
   void nextTick(() => promptEl.value?.focus())
 }
 
-function openMaskEditor(versionId: number) {
-  selectedVersionId.value = versionId
-  prompt.value = ''
-  maskBlob.value = null
-  maskEditorOpen.value = true
+function clearFollowUp() {
+  selectedVersionId.value = null
   void nextTick(() => promptEl.value?.focus())
 }
 
 async function run() {
   if (!canRun.value) return
+  const action = effectiveMode.value
+  const promptText = trimmedPrompt.value || uploadFile.value?.name || ''
+  const pending = addPendingMessage(promptText, action)
+  prompt.value = ''
   generating.value = true
-  transientImages.value = []
-  startThinking()
+  startPendingTimer()
   controller?.abort()
   controller = new AbortController()
-  const action = effectiveMode.value
   try {
     errorText.value = ''
     if (action === 'upload') {
-      await saveBlob(uploadFile.value!, 'upload')
+      pending.images = [{ url: URL.createObjectURL(uploadFile.value!), mimeType: uploadFile.value!.type }]
+      await saveBlob(uploadFile.value!, 'upload', promptText, pending)
       uploadFile.value = null
     } else if (action === 'generate') {
       const result = await generateImage(selectedKey.value!.key, {
         model: model.value,
-        prompt: trimmedPrompt.value,
+        prompt: promptText,
         size: size.value,
         n: 1,
         response_format: 'b64_json',
       }, { signal: controller.signal })
-      transientImages.value = result.images
-      await saveImages(result.images, 'generation')
+      finishThinking(pending, result.images)
+      await saveImages(result.images, 'generation', promptText, pending)
     } else {
-      const source = await fetch(selectedImageUrl.value).then((res) => res.blob())
+      const source = await fetchVersionBlob(selectedVersion.value!)
       const result = await editImage(selectedKey.value!.key, {
         model: model.value,
-        prompt: trimmedPrompt.value,
+        prompt: promptText,
         image: source,
-        mask: action === 'mask' ? maskBlob.value : null,
         size: size.value,
         n: 1,
         response_format: 'b64_json',
       }, { signal: controller.signal })
-      transientImages.value = result.images
-      await saveImages(result.images, action === 'mask' ? 'mask_edit' : 'edit')
+      finishThinking(pending, result.images)
+      await saveImages(result.images, 'edit', promptText, pending)
     }
-    prompt.value = ''
-    maskBlob.value = null
-    maskEditorOpen.value = false
+    removePendingMessage(pending.id)
     appStore.showSuccess?.('图片已保存')
   } catch (err: unknown) {
     if ((err as Error)?.name !== 'AbortError') {
@@ -410,33 +460,36 @@ async function run() {
     }
   } finally {
     generating.value = false
-    transientImages.value = []
-    stopThinking()
+    stopPendingTimer()
     controller = null
   }
 }
 
-async function saveImages(images: GeneratedImage[], savedMode: 'generation' | 'edit' | 'mask_edit') {
+async function saveImages(images: GeneratedImage[], savedMode: 'generation' | 'edit', promptText: string, pending: PendingMessage) {
   for (const image of images) {
     const blob = image.url.startsWith('data:') ? dataUrlToBlob(image.url) : await fetch(image.url).then((res) => res.blob())
-    await saveBlob(blob, savedMode)
+    await saveBlob(blob, savedMode, promptText, pending)
   }
 }
 
-async function saveBlob(blob: Blob, savedMode: 'generation' | 'edit' | 'mask_edit' | 'upload') {
+async function saveBlob(blob: Blob, savedMode: 'generation' | 'edit' | 'upload', promptText: string, pending: PendingMessage) {
   const form = new FormData()
   form.append('image', blob, 'image.png')
   form.append('mode', savedMode)
-  form.append('prompt', trimmedPrompt.value || uploadFile.value?.name || '')
+  form.append('prompt', promptText)
   form.append('model', model.value)
   form.append('size', size.value)
-  if (savedMode === 'mask_edit' && maskBlob.value) form.append('mask', maskBlob.value, 'mask.png')
   if (selectedProjectId.value) form.append('project_id', String(selectedProjectId.value))
   if (selectedVersion.value && savedMode !== 'generation' && savedMode !== 'upload') {
     form.append('parent_version_id', String(selectedVersion.value.id))
     form.append('source_version_id', String(selectedVersion.value.id))
   }
   const detail = await uploadImageVersion(form)
+  await loadVersionImages(detail.versions)
+  const savedVersion = detail.versions.at(-1)
+  if (savedVersion) {
+    saveThoughtRecord(savedVersion.id, buildThoughtRecord(pending, savedVersion, savedMode))
+  }
   selectedProjectId.value = detail.project.id
   selectedDetail.value = detail
   selectedVersionId.value = detail.versions.at(-1)?.id || null
@@ -450,33 +503,193 @@ function onUploadFile(event: Event) {
   uploadFile.value = (event.target as HTMLInputElement).files?.[0] || null
 }
 
-async function deleteVersion(id: number) {
-  await deleteImageVersion(id)
-  if (selectedProjectId.value) await selectProject(selectedProjectId.value)
-}
-
-function versionUrl(version: ImageWorkspaceVersion) {
-  return imageVersionFileUrl(version.id, isAdmin.value)
+function versionSrc(version: ImageWorkspaceVersion) {
+  return versionObjectUrls.value[version.id] || imageVersionFileUrl(version.id, isAdmin.value)
 }
 
 function modeLabel(value: string) {
   if (value === 'edit') return '编辑图片'
-  if (value === 'mask_edit') return '局部编辑图片'
+  if (value === 'mask' || value === 'mask_edit') return '局部编辑图片'
   if (value === 'upload') return '上传图片'
   return '生成图片'
 }
 
-function startThinking() {
-  stopThinking()
-  thinkingSeconds.value = 0
-  thinkingTimer = window.setInterval(() => {
-    thinkingSeconds.value += 1
+function preferredProjectId(items: ImageWorkspaceProjectSummary[]) {
+  return items.find((project) => project.version_count > 0)?.id || items[0]?.id || null
+}
+
+function addPendingMessage(promptText: string, action: WorkspaceMode) {
+  const message = {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    prompt: promptText || modeLabel(action),
+    action,
+    status: action === 'upload' ? 'saving' : 'thinking',
+    seconds: 0,
+    images: [] as GeneratedImage[],
+  } satisfies PendingMessage
+  pendingMessages.value.push(message)
+  return message
+}
+
+function removePendingMessage(id: string) {
+  const message = pendingMessages.value.find((item) => item.id === id)
+  message?.images.forEach((image) => {
+    if (image.url.startsWith('blob:')) URL.revokeObjectURL(image.url)
+  })
+  pendingMessages.value = pendingMessages.value.filter((item) => item.id !== id)
+}
+
+function finishThinking(message: PendingMessage, images: GeneratedImage[]) {
+  pendingMessages.value = pendingMessages.value.map((item) => item.id === message.id
+    ? { ...item, status: 'saving', images }
+    : item)
+}
+
+function startPendingTimer() {
+  stopPendingTimer()
+  pendingTimer = window.setInterval(() => {
+    pendingMessages.value.forEach((message) => {
+      if (message.status === 'thinking') message.seconds += 1
+    })
   }, 1000)
 }
 
-function stopThinking() {
-  if (thinkingTimer) window.clearInterval(thinkingTimer)
-  thinkingTimer = 0
+function stopPendingTimer() {
+  if (pendingTimer) window.clearInterval(pendingTimer)
+  pendingTimer = 0
+}
+
+function pendingLabel(message: PendingMessage) {
+  if (message.action === 'upload') return '上传图片 ›'
+  return `Thought for ${message.seconds}s ›`
+}
+
+function versionThoughtKey(version: ImageWorkspaceVersion) {
+  return `version-${version.id}`
+}
+
+function pendingThoughtKey(message: PendingMessage) {
+  return `pending-${message.id}`
+}
+
+function toggleThought(key: string) {
+  expandedThoughtKey.value = expandedThoughtKey.value === key ? null : key
+}
+
+function versionThoughtLabel(version: ImageWorkspaceVersion) {
+  if (version.mode === 'upload') return 'Uploaded image ›'
+  const thought = versionThoughts.value[version.id]
+  return thought ? `Thought for ${thought.seconds}s ›` : 'Thought ›'
+}
+
+function versionThoughtSteps(version: ImageWorkspaceVersion): ThoughtStep[] {
+  const thought = versionThoughts.value[version.id]
+  if (thought) return thought.steps
+  return [
+    { label: '收到提示', detail: version.prompt || modeLabel(version.mode) },
+    { label: modeLabel(version.mode), detail: [version.model, sizeLabel(version.size)].filter(Boolean).join(' · ') },
+    { label: '结果已保存', detail: `image-${version.id}` },
+  ]
+}
+
+function pendingThoughtSteps(message: PendingMessage): ThoughtStep[] {
+  const steps: ThoughtStep[] = [
+    { label: '收到提示', detail: message.prompt },
+    { label: message.action === 'upload' ? '上传图片' : modeLabel(message.action), detail: [model.value, sizeLabel(size.value)].filter(Boolean).join(' · ') },
+  ]
+  steps.push({ label: message.status === 'thinking' ? '正在生成图片' : '正在保存结果' })
+  return steps
+}
+
+function buildThoughtRecord(message: PendingMessage, version: ImageWorkspaceVersion, savedMode: 'generation' | 'edit' | 'upload'): ThoughtRecord {
+  return {
+    seconds: message.seconds,
+    steps: [
+      { label: '收到提示', detail: message.prompt },
+      { label: modeLabel(savedMode), detail: [version.model || model.value, sizeLabel(version.size || size.value)].filter(Boolean).join(' · ') },
+      { label: '结果已保存', detail: `image-${version.id}` },
+    ],
+  }
+}
+
+function saveThoughtRecord(versionId: number, record: ThoughtRecord) {
+  versionThoughts.value = {
+    ...versionThoughts.value,
+    [versionId]: record,
+  }
+  try {
+    localStorage.setItem(THOUGHT_STORAGE_KEY, JSON.stringify(versionThoughts.value))
+  } catch {
+    // Thought details are optional UI state.
+  }
+}
+
+function readStoredThoughts(): Record<number, ThoughtRecord> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(THOUGHT_STORAGE_KEY) || '{}') as Record<string, ThoughtRecord>
+    return Object.fromEntries(Object.entries(parsed).filter(([, record]) => isThoughtRecord(record)).map(([id, record]) => [Number(id), record]))
+  } catch {
+    return {}
+  }
+}
+
+function isThoughtRecord(value: unknown): value is ThoughtRecord {
+  if (!value || typeof value !== 'object') return false
+  const record = value as ThoughtRecord
+  return Number.isFinite(record.seconds) && Array.isArray(record.steps)
+}
+
+function sizeLabel(value: string) {
+  return IMAGE_SIZE_OPTIONS.find((item) => item.value === value)?.label || value
+}
+
+function imageSizeOptionLabel(option: (typeof IMAGE_SIZE_OPTIONS)[number]) {
+  const price = imageSizePrice(option.value)
+  return price === null ? option.label : `${option.label} · ${formatImagePrice(price)}`
+}
+
+function imageSizePrice(value: ImageSizeOption) {
+  const group = selectedGroup.value
+  if (!group) return null
+  const basePrice = {
+    '1024x1024': group.image_price_1k,
+    '1536x1536': group.image_price_2k,
+    '2048x2048': group.image_price_4k,
+  }[value]
+  if (basePrice === null || basePrice === undefined) return null
+  const multiplier = group.image_rate_independent ? group.image_rate_multiplier : group.rate_multiplier
+  const price = Number(basePrice) * (Number.isFinite(Number(multiplier)) ? Number(multiplier) : 1)
+  return Number.isFinite(price) && price >= 0 ? price : null
+}
+
+function formatImagePrice(value: number) {
+  return `$${value.toFixed(6).replace(/0+$/, '').replace(/\.$/, '')}`
+}
+
+async function loadVersionImages(versions: ImageWorkspaceVersion[]) {
+  const ids = new Set(versions.map((version) => version.id))
+  Object.entries(versionObjectUrls.value).forEach(([rawId, url]) => {
+    if (!ids.has(Number(rawId))) {
+      URL.revokeObjectURL(url)
+      delete versionObjectUrls.value[Number(rawId)]
+    }
+  })
+  await Promise.all(versions.map(async (version) => {
+    if (versionObjectUrls.value[version.id]) return
+    try {
+      const blob = await fetchVersionBlob(version)
+      versionObjectUrls.value = {
+        ...versionObjectUrls.value,
+        [version.id]: URL.createObjectURL(blob),
+      }
+    } catch {
+      // Keep direct URL fallback so broken auth or storage issues remain visible.
+    }
+  }))
+}
+
+async function fetchVersionBlob(version: ImageWorkspaceVersion) {
+  return fetchImageVersionBlob(version.id, isAdmin.value)
 }
 
 function readErrorText(err: unknown): string {
@@ -487,6 +700,30 @@ function readErrorText(err: unknown): string {
 onMounted(loadData)
 onBeforeUnmount(() => {
   controller?.abort()
-  stopThinking()
+  stopPendingTimer()
+  Object.values(versionObjectUrls.value).forEach((url) => URL.revokeObjectURL(url))
+  pendingMessages.value.forEach((message) => {
+    message.images.forEach((image) => {
+      if (image.url.startsWith('blob:')) URL.revokeObjectURL(image.url)
+    })
+  })
 })
 </script>
+
+<style scoped>
+.image-control-field {
+  @apply flex min-w-0 flex-col gap-1;
+}
+
+.image-control-label {
+  @apply text-xs font-medium text-gray-500 dark:text-dark-400;
+}
+
+.image-control-select :deep(.select-trigger) {
+  @apply h-9 rounded-lg px-3 py-1.5 text-sm;
+}
+
+.image-control-select :deep(.select-icon svg) {
+  @apply h-4 w-4;
+}
+</style>

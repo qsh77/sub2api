@@ -1,15 +1,16 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
 import ImageGenerationView from '../ImageGenerationView.vue'
 import type { AdminGroup, ApiKey } from '@/types'
 
-const { getGroups, getGroupApiKeys, listProjects, getProject, generateImage, uploadImageVersion, showError, showSuccess } = vi.hoisted(() => ({
+const { getGroups, getGroupApiKeys, listProjects, getProject, generateImage, fetchImageVersionBlob, uploadImageVersion, showError, showSuccess } = vi.hoisted(() => ({
   getGroups: vi.fn(),
   getGroupApiKeys: vi.fn(),
   listProjects: vi.fn(),
   getProject: vi.fn(),
   generateImage: vi.fn(),
+  fetchImageVersionBlob: vi.fn(),
   uploadImageVersion: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('@/api/imageGeneration', async () => {
   return {
     ...actual,
     generateImage,
+    fetchImageVersionBlob,
     uploadImageVersion,
   }
 })
@@ -180,14 +182,26 @@ async function mountView(groups = [baseGroup], keys = [apiKey()]) {
 
 describe('admin ImageGenerationView', () => {
   beforeEach(() => {
+    let objectUrlIndex = 0
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn(() => `blob:admin-${++objectUrlIndex}`),
+      revokeObjectURL: vi.fn(),
+    })
     getGroups.mockReset()
     getGroupApiKeys.mockReset()
     listProjects.mockReset()
     getProject.mockReset()
     generateImage.mockReset()
+    fetchImageVersionBlob.mockReset()
     uploadImageVersion.mockReset()
     showError.mockReset()
     showSuccess.mockReset()
+    fetchImageVersionBlob.mockResolvedValue(new Blob(['saved'], { type: 'image/png' }))
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('loads OpenAI image-enabled groups and active group API keys', async () => {
@@ -197,7 +211,51 @@ describe('admin ImageGenerationView', () => {
     expect(getGroupApiKeys).toHaveBeenCalledWith(1, 1, 50)
     expect(wrapper.text()).toContain('Image Group')
     expect(wrapper.text()).toContain('Active Key')
-    expect(wrapper.text()).toContain('对话式生成、编辑和管理图片')
+    expect(wrapper.find('header h1').exists()).toBe(false)
+  })
+
+  it('shows final image prices in size options', async () => {
+    const wrapper = await mountView([
+      group({
+        rate_multiplier: 2,
+        image_rate_independent: false,
+        image_price_1k: 0.1,
+        image_price_2k: 0.15,
+        image_price_4k: 0,
+      }),
+    ])
+
+    expect(wrapper.text()).toContain('1K · $0.2')
+    expect(wrapper.text()).toContain('2K · $0.3')
+    expect(wrapper.text()).toContain('4K · $0')
+  })
+
+  it('opens the first project that still has saved versions', async () => {
+    getGroups.mockResolvedValue([baseGroup])
+    getGroupApiKeys.mockResolvedValue({ items: [apiKey()], total: 1, page: 1, page_size: 50, pages: 1 })
+    listProjects.mockResolvedValue({
+      items: [
+        { id: 3, user_id: 1, title: 'Empty latest', status: 'active', created_at: '', updated_at: '', version_count: 0 },
+        { id: 5, user_id: 1, title: 'Saved image', status: 'active', created_at: '', updated_at: '', version_count: 1 },
+      ],
+      total: 2,
+      page: 1,
+      page_size: 50,
+      pages: 1,
+    })
+    getProject.mockResolvedValue(savedDetail)
+
+    mount(ImageGenerationView, {
+      global: {
+        stubs: {
+          AppLayout: AppLayoutStub,
+          Select: SelectStub,
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(getProject).toHaveBeenCalledWith(5)
   })
 
   it('filters out inactive keys and disabled groups', async () => {
@@ -277,7 +335,8 @@ describe('admin ImageGenerationView', () => {
       { signal: expect.any(AbortSignal) },
     )
     expect(uploadImageVersion).toHaveBeenCalled()
-    expect(wrapper.find('img[alt="generated-image-9"]').attributes('src')).toBe('/api/v1/admin/images/versions/9/file')
+    expect(fetchImageVersionBlob).toHaveBeenCalledWith(9, true)
+    expect(wrapper.find('img[alt="generated-image-9"]').attributes('src')).toBe('blob:admin-1')
     expect(showSuccess).toHaveBeenCalledWith('图片已保存')
   })
 

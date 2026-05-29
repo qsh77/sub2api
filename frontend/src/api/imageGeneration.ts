@@ -237,6 +237,13 @@ export async function deleteImageVersion(id: number): Promise<void> {
   await apiClient.delete(`/images/versions/${id}`)
 }
 
+export async function fetchImageVersionBlob(id: number, admin = false): Promise<Blob> {
+  const { data } = await apiClient.get(`${admin ? '/admin/images' : '/images'}/versions/${id}/file`, {
+    responseType: 'blob',
+  })
+  return data as Blob
+}
+
 export function imageVersionFileUrl(id: number, admin = false): string {
   return `/api/v1/${admin ? 'admin/images' : 'images'}/versions/${id}/file`
 }
