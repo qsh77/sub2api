@@ -1,6 +1,7 @@
 import { apiClient } from './client'
 
-export type ImageSizeOption = '1024x1024' | '1536x1536' | '2048x2048'
+export type ImageSizeOption = '1024x1024' | '2048x2048' | '3840x2160' | '2160x3840'
+export type ImageBillingTier = '1K' | '2K' | '4K'
 export type ImageWorkspaceMode = 'generation' | 'edit' | 'mask_edit' | 'upload'
 
 export interface ImageGenerationRequest {
@@ -100,11 +101,12 @@ export interface ImageKeyGroupState {
 }
 
 export const IMAGE_SIZE_OPTIONS = [
-  { label: '1K', value: '1024x1024' },
-  { label: '2K', value: '1536x1536' },
-  { label: '4K', value: '2048x2048' },
+  { label: '1K 方图', value: '1024x1024', tier: '1K' },
+  { label: '2K 方图', value: '2048x2048', tier: '2K' },
+  { label: '4K 横图', value: '3840x2160', tier: '4K' },
+  { label: '4K 竖图', value: '2160x3840', tier: '4K' },
 ] as const
-export const DEFAULT_IMAGE_MODELS = ['gpt-image-2', 'gpt-image-1.5', 'gpt-image-1'] as const
+export const DEFAULT_IMAGE_MODELS = ['gpt-image-2'] as const
 
 interface GenerateImageOptions {
   signal?: AbortSignal
@@ -114,11 +116,19 @@ export function filterImageModels(models: ImageModelCandidate[]): string[] {
   const imageModels = models
     .filter((model) => {
       const name = model.name.toLowerCase()
-      return model.pricing?.billing_mode === 'image' || name.includes('image')
+      return supportsImageWorkspaceModel(name) && (model.pricing?.billing_mode === 'image' || name.includes('image'))
     })
     .map((model) => model.name)
 
   return imageModels.length > 0 ? Array.from(new Set(imageModels)) : [...DEFAULT_IMAGE_MODELS]
+}
+
+export function supportsImageWorkspaceModel(model: string): boolean {
+  return model.trim().toLowerCase() === 'gpt-image-2'
+}
+
+export function imageBillingTierForSize(size: string): ImageBillingTier | null {
+  return IMAGE_SIZE_OPTIONS.find((option) => option.value === size)?.tier || null
 }
 
 export function resolveKeyImageState(group: ImageKeyGroupState | null | undefined): {

@@ -225,9 +225,10 @@ describe('admin ImageGenerationView', () => {
       }),
     ])
 
-    expect(wrapper.text()).toContain('1K · $0.2')
-    expect(wrapper.text()).toContain('2K · $0.3')
-    expect(wrapper.text()).toContain('4K · $0')
+    expect(wrapper.text()).toContain('1K 方图 · $0.2')
+    expect(wrapper.text()).toContain('2K 方图 · $0.3')
+    expect(wrapper.text()).toContain('4K 横图 · $0')
+    expect(wrapper.text()).toContain('4K 竖图 · $0')
   })
 
   it('opens the first project that still has saved versions', async () => {

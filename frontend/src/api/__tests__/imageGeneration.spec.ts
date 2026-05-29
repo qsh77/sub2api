@@ -109,18 +109,19 @@ describe('imageGeneration API', () => {
 
 describe('image generation helpers', () => {
   it('exposes image size labels and values', () => {
-    expect(IMAGE_SIZE_OPTIONS.map((item) => item.value)).toEqual(['1024x1024', '1536x1536', '2048x2048'])
-    expect(IMAGE_SIZE_OPTIONS.map((item) => item.label)).toEqual(['1K', '2K', '4K'])
+    expect(IMAGE_SIZE_OPTIONS.map((item) => item.value)).toEqual(['1024x1024', '2048x2048', '3840x2160', '2160x3840'])
+    expect(IMAGE_SIZE_OPTIONS.map((item) => item.label)).toEqual(['1K 方图', '2K 方图', '4K 横图', '4K 竖图'])
   })
 
   it('filters image-capable models and falls back to defaults', () => {
     expect(filterImageModels([
       { name: 'gpt-5.4', pricing: { billing_mode: 'token' } },
       { name: 'gpt-image-1', pricing: { billing_mode: 'image' } },
+      { name: 'gpt-image-2', pricing: { billing_mode: 'image' } },
       { name: 'custom-image-model', pricing: null },
-    ])).toEqual(['gpt-image-1', 'custom-image-model'])
+    ])).toEqual(['gpt-image-2'])
 
-    expect(filterImageModels([])).toEqual(['gpt-image-2', 'gpt-image-1.5', 'gpt-image-1'])
+    expect(filterImageModels([])).toEqual(['gpt-image-2'])
   })
 
   it('resolves key image availability from group fields', () => {

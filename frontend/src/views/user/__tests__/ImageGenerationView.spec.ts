@@ -3,10 +3,11 @@ import { flushPromises, mount } from '@vue/test-utils'
 
 import ImageGenerationView from '../ImageGenerationView.vue'
 
-const { list, getAvailable, generateImage, fetchImageVersionBlob, listImageProjects, getImageProject, uploadImageVersion, showError, showSuccess } = vi.hoisted(() => ({
+const { list, getAvailable, generateImage, editImage, fetchImageVersionBlob, listImageProjects, getImageProject, uploadImageVersion, showError, showSuccess } = vi.hoisted(() => ({
   list: vi.fn(),
   getAvailable: vi.fn(),
   generateImage: vi.fn(),
+  editImage: vi.fn(),
   fetchImageVersionBlob: vi.fn(),
   listImageProjects: vi.fn(),
   getImageProject: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock('@/api/imageGeneration', async () => {
   return {
     ...actual,
     generateImage,
+    editImage,
     fetchImageVersionBlob,
     listImageProjects,
     getImageProject,
@@ -127,7 +129,7 @@ function channels() {
           platform: 'openai',
           groups: [],
           supported_models: [
-            { name: 'gpt-image-1', platform: 'openai', pricing: { billing_mode: 'image' } },
+            { name: 'gpt-image-2', platform: 'openai', pricing: { billing_mode: 'image' } },
           ],
         },
       ],
@@ -137,12 +139,17 @@ function channels() {
 
 async function mountView(keys = [apiKey()], workspace: {
   projects?: unknown
-  detail?: unknown
+  detail?: unknown | ((id: number) => unknown)
 } = {}) {
   list.mockResolvedValue({ items: keys, total: keys.length, page: 1, page_size: 100, pages: 1 })
   getAvailable.mockResolvedValue(channels())
   listImageProjects.mockResolvedValue(workspace.projects || { items: [], total: 0, page: 1, page_size: 50, pages: 1 })
-  getImageProject.mockResolvedValue(workspace.detail || { project: { id: 1, user_id: 1, title: 'Saved', status: 'active', created_at: '', updated_at: '' }, versions: [] })
+  const detail = workspace.detail || { project: { id: 1, user_id: 1, title: 'Saved', status: 'active', created_at: '', updated_at: '' }, versions: [] }
+  if (typeof detail === 'function') {
+    getImageProject.mockImplementation(async (id: number) => detail(id))
+  } else {
+    getImageProject.mockResolvedValue(detail)
+  }
   uploadImageVersion.mockResolvedValue({
     project: { id: 1, user_id: 1, title: 'Saved', cover_version_id: 1, status: 'active', created_at: '', updated_at: '' },
     versions: [{
@@ -151,7 +158,7 @@ async function mountView(keys = [apiKey()], workspace: {
       user_id: 1,
       mode: 'generation',
       prompt: 'a compact control room',
-      model: 'gpt-image-1',
+      model: 'gpt-image-2',
       size: '1024x1024',
       mime_type: 'image/png',
       file_size_bytes: 5,
@@ -185,6 +192,7 @@ describe('ImageGenerationView', () => {
     list.mockReset()
     getAvailable.mockReset()
     generateImage.mockReset()
+    editImage.mockReset()
     fetchImageVersionBlob.mockReset()
     listImageProjects.mockReset()
     getImageProject.mockReset()
@@ -255,7 +263,7 @@ describe('ImageGenerationView', () => {
     expect(generateImage).toHaveBeenCalledWith(
       'sk-enabled',
       {
-        model: 'gpt-image-1',
+        model: 'gpt-image-2',
         prompt: 'a compact control room',
         size: '1024x1024',
         n: 1,
@@ -316,7 +324,7 @@ describe('ImageGenerationView', () => {
         user_id: 1,
         mode: 'generation',
         prompt: 'a stopwatch image',
-        model: 'gpt-image-1',
+        model: 'gpt-image-2',
         size: '1024x1024',
         mime_type: 'image/png',
         file_size_bytes: 5,
@@ -341,13 +349,31 @@ describe('ImageGenerationView', () => {
     vi.useRealTimers()
   })
 
+  it('does not leave a running thought when saving a generated image fails', async () => {
+    generateImage.mockResolvedValue({
+      images: [{ url: 'data:image/png;base64,aGVsbG8=' }],
+      raw: {},
+    })
+    const wrapper = await mountView()
+    uploadImageVersion.mockRejectedValue(new Error('save exploded'))
+
+    await wrapper.find('textarea').setValue('a long prompt that generates but fails to save')
+    await wrapper.find('[data-testid="generate-image"]').trigger('click')
+    await flushPromises()
+
+    expect(showError).toHaveBeenCalledWith('save exploded')
+    expect(wrapper.text()).toContain('保存失败')
+    expect(wrapper.text()).not.toContain('Thought for')
+    expect(wrapper.find('img[alt="pending-image-1"]').exists()).toBe(true)
+  })
+
   it('restores saved thought timing after reload', async () => {
     localStorage.setItem('sub2api:image-thoughts:v1', JSON.stringify({
       1: {
         seconds: 4,
         steps: [
           { label: '收到提示', detail: 'a persisted image' },
-          { label: '生成图片', detail: 'gpt-image-1 · 1K' },
+          { label: '生成图片', detail: 'gpt-image-2 · 1K 方图' },
           { label: '结果已保存', detail: 'image-1' },
         ],
       },
@@ -368,7 +394,7 @@ describe('ImageGenerationView', () => {
           user_id: 1,
           mode: 'generation',
           prompt: 'a persisted image',
-          model: 'gpt-image-1',
+          model: 'gpt-image-2',
           size: '1024x1024',
           mime_type: 'image/png',
           file_size_bytes: 5,
@@ -394,15 +420,46 @@ describe('ImageGenerationView', () => {
     await wrapper.find('[data-testid="generate-image"]').trigger('click')
     await flushPromises()
 
-    const continueButton = wrapper.findAll('button').find((button) => button.text() === '继续改')
-    expect(continueButton).toBeTruthy()
-    await continueButton!.trigger('click')
-
-    expect(wrapper.text()).toContain('正在修改：image-1')
-    expect((wrapper.find('textarea').element as HTMLTextAreaElement).placeholder).toBe('直接说要怎么修改这张图')
+    expect(wrapper.text()).not.toContain('正在修改：image-1')
+    expect(wrapper.text()).not.toContain('取消修改')
+    expect((wrapper.find('textarea').element as HTMLTextAreaElement).placeholder).toBe('')
+    expect(wrapper.text()).not.toContain('继续改')
     expect(wrapper.find('button[title="删除"]').exists()).toBe(false)
     expect(wrapper.find('button[title="画局部区域"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('◌')
+  })
+
+  it('edits the latest image directly from natural language', async () => {
+    generateImage.mockResolvedValue({
+      images: [{ url: 'data:image/png;base64,aGVsbG8=' }],
+      raw: {},
+    })
+    editImage.mockResolvedValue({
+      images: [{ url: 'data:image/png;base64,aGVsbG8=' }],
+      raw: {},
+    })
+    const wrapper = await mountView()
+
+    await wrapper.find('textarea').setValue('a source image')
+    await wrapper.find('[data-testid="generate-image"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('textarea').setValue('改大点')
+    await wrapper.find('[data-testid="generate-image"]').trigger('click')
+    await flushPromises()
+
+    expect(editImage).toHaveBeenCalledWith(
+      'sk-enabled',
+      expect.objectContaining({
+        model: 'gpt-image-2',
+        prompt: expect.stringContaining('用户要求：改大点'),
+        image: expect.any(Blob),
+        size: '1024x1024',
+        n: 1,
+        response_format: 'b64_json',
+      }),
+      { signal: expect.any(AbortSignal) },
+    )
   })
 
   it('previews an uploaded image while it is being saved', async () => {
@@ -414,10 +471,16 @@ describe('ImageGenerationView', () => {
     Object.defineProperty(input, 'files', { value: [file] })
 
     await wrapper.find('input[type="file"]').trigger('change')
+
+    expect(wrapper.text()).not.toContain('待上传')
+    expect(wrapper.find('img[alt="selected-upload-image"]').attributes('src')).toBe('blob:mock-1')
+
     await wrapper.find('[data-testid="generate-image"]').trigger('click')
 
     expect(wrapper.text()).toContain('upload.png')
-    expect(wrapper.find('img[alt="pending-image-1"]').attributes('src')).toBe('blob:mock-1')
+    expect(wrapper.find('img[alt="selected-upload-image"]').exists()).toBe(false)
+    expect(wrapper.find('img[alt="uploaded-source-image-1"]').attributes('src')).toBe('blob:mock-1')
+    expect(wrapper.find('img[alt="pending-image-1"]').exists()).toBe(false)
 
     saving.resolve({
       project: { id: 2, user_id: 1, title: 'upload.png', cover_version_id: 2, status: 'active', created_at: '', updated_at: '' },
@@ -427,7 +490,7 @@ describe('ImageGenerationView', () => {
         user_id: 1,
         mode: 'upload',
         prompt: 'upload.png',
-        model: 'gpt-image-1',
+        model: 'gpt-image-2',
         size: '1024x1024',
         mime_type: 'image/png',
         file_size_bytes: 5,
@@ -438,5 +501,237 @@ describe('ImageGenerationView', () => {
       }],
     })
     await flushPromises()
+  })
+
+  it('edits an uploaded image with the typed prompt instead of saving the original', async () => {
+    const editing = deferred<{ images: Array<{ url: string }>; raw: Record<string, never> }>()
+    editImage.mockReturnValue(editing.promise)
+    const wrapper = await mountView()
+    const file = new File(['source-image'], 'source.png', { type: 'image/png' })
+    const input = wrapper.find('input[type="file"]').element as HTMLInputElement
+    Object.defineProperty(input, 'files', { value: [file] })
+
+    await wrapper.find('input[type="file"]').trigger('change')
+    await wrapper.find('textarea').setValue('把背景换成蓝色')
+    await wrapper.find('[data-testid="generate-image"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('img[alt="selected-upload-image"]').exists()).toBe(false)
+    expect(wrapper.find('img[alt="uploaded-source-image-1"]').attributes('src')).toBe('blob:mock-1')
+    expect(wrapper.text()).toContain('把背景换成蓝色')
+    expect(wrapper.text()).not.toContain('待上传')
+
+    expect(editImage).toHaveBeenCalledWith(
+      'sk-enabled',
+      expect.objectContaining({
+        model: 'gpt-image-2',
+        prompt: '把背景换成蓝色',
+        image: file,
+        size: '1024x1024',
+        n: 1,
+        response_format: 'b64_json',
+      }),
+      { signal: expect.any(AbortSignal) },
+    )
+
+    editing.resolve({
+      images: [{ url: 'data:image/png;base64,ZWRpdGVk' }],
+      raw: {},
+    })
+    await flushPromises()
+
+    expect(uploadImageVersion).toHaveBeenCalled()
+    const form = uploadImageVersion.mock.calls.at(-1)?.[0] as FormData
+    expect(form.get('mode')).toBe('edit')
+    expect(form.get('prompt')).toBe('把背景换成蓝色')
+  })
+
+  it('does not attach uploaded prompt edits to a previously selected saved image', async () => {
+    editImage.mockResolvedValue({
+      images: [{ url: 'data:image/png;base64,ZWRpdGVk' }],
+      raw: {},
+    })
+    const wrapper = await mountView([apiKey()], {
+      projects: {
+        items: [{ id: 7, user_id: 1, title: 'Old image', cover_version_id: 7, status: 'active', created_at: '', updated_at: '', version_count: 1 }],
+        total: 1,
+        page: 1,
+        page_size: 50,
+        pages: 1,
+      },
+      detail: {
+        project: { id: 7, user_id: 1, title: 'Old image', cover_version_id: 7, status: 'active', created_at: '', updated_at: '' },
+        versions: [{
+          id: 7,
+          project_id: 7,
+          user_id: 1,
+          mode: 'generation',
+          prompt: 'old image',
+          model: 'gpt-image-2',
+          size: '1024x1024',
+          mime_type: 'image/png',
+          file_size_bytes: 5,
+          sha256: '',
+          width: 1,
+          height: 1,
+          created_at: '',
+        }],
+      },
+    })
+    const file = new File(['source-image'], 'source.png', { type: 'image/png' })
+    const input = wrapper.find('input[type="file"]').element as HTMLInputElement
+    Object.defineProperty(input, 'files', { value: [file] })
+
+    await wrapper.find('input[type="file"]').trigger('change')
+    await wrapper.find('textarea').setValue('换成绿色')
+    await wrapper.find('[data-testid="generate-image"]').trigger('click')
+    await flushPromises()
+
+    const form = uploadImageVersion.mock.calls.at(-1)?.[0] as FormData
+    expect(form.get('mode')).toBe('edit')
+    expect(form.has('parent_version_id')).toBe(false)
+    expect(form.has('source_version_id')).toBe(false)
+  })
+
+  it('does not carry an unsent upload draft into another conversation', async () => {
+    const detailFor = (id: number) => ({
+      project: { id, user_id: 1, title: id === 7 ? 'Old image' : 'Other image', cover_version_id: id, status: 'active', created_at: '', updated_at: '' },
+      versions: [{
+        id,
+        project_id: id,
+        user_id: 1,
+        mode: 'generation',
+        prompt: id === 7 ? 'old image' : 'other image',
+        model: 'gpt-image-2',
+        size: '1024x1024',
+        mime_type: 'image/png',
+        file_size_bytes: 5,
+        sha256: '',
+        width: 1,
+        height: 1,
+        created_at: '',
+      }],
+    })
+    const wrapper = await mountView([apiKey()], {
+      projects: {
+        items: [
+          { id: 7, user_id: 1, title: 'Old image', cover_version_id: 7, status: 'active', created_at: '', updated_at: '', version_count: 1 },
+          { id: 8, user_id: 1, title: 'Other image', cover_version_id: 8, status: 'active', created_at: '', updated_at: '', version_count: 1 },
+        ],
+        total: 2,
+        page: 1,
+        page_size: 50,
+        pages: 1,
+      },
+      detail: detailFor,
+    })
+    const newConversation = wrapper.findAll('button').find((button) => button.text() === '新对话')
+    await newConversation!.trigger('click')
+    const file = new File(['source-image'], 'source.png', { type: 'image/png' })
+    const input = wrapper.find('input[type="file"]').element as HTMLInputElement
+    Object.defineProperty(input, 'files', { value: [file] })
+
+    await wrapper.find('input[type="file"]').trigger('change')
+    expect(wrapper.find('img[alt="selected-upload-image"]').exists()).toBe(true)
+
+    const otherProject = wrapper.findAll('button').find((button) => button.text() === 'Other image')
+    await otherProject!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('img[alt="selected-upload-image"]').exists()).toBe(false)
+    expect(wrapper.find('img[alt="generated-image-8"]').exists()).toBe(true)
+    expect(wrapper.find('img[alt="generated-image-7"]').exists()).toBe(false)
+  })
+
+  it('keeps an in-flight new conversation result out of another selected conversation', async () => {
+    const generation = deferred<{ images: Array<{ url: string }>; raw: Record<string, never> }>()
+    generateImage.mockReturnValue(generation.promise)
+    const oldDetail = {
+      project: { id: 7, user_id: 1, title: 'Old image', cover_version_id: 7, status: 'active', created_at: '', updated_at: '' },
+      versions: [{
+        id: 7,
+        project_id: 7,
+        user_id: 1,
+        mode: 'generation',
+        prompt: 'old image',
+        model: 'gpt-image-2',
+        size: '1024x1024',
+        mime_type: 'image/png',
+        file_size_bytes: 5,
+        sha256: '',
+        width: 1,
+        height: 1,
+        created_at: '',
+      }],
+    }
+    const savedNewDetail = {
+      project: { id: 2, user_id: 1, title: 'new draft image', cover_version_id: 2, status: 'active', created_at: '', updated_at: '' },
+      versions: [{
+        id: 2,
+        project_id: 2,
+        user_id: 1,
+        mode: 'generation',
+        prompt: 'new draft image',
+        model: 'gpt-image-2',
+        size: '1024x1024',
+        mime_type: 'image/png',
+        file_size_bytes: 5,
+        sha256: '',
+        width: 1,
+        height: 1,
+        created_at: '',
+      }],
+    }
+    const wrapper = await mountView([apiKey()], {
+      projects: {
+        items: [{ id: 7, user_id: 1, title: 'Old image', cover_version_id: 7, status: 'active', created_at: '', updated_at: '', version_count: 1 }],
+        total: 1,
+        page: 1,
+        page_size: 50,
+        pages: 1,
+      },
+      detail: oldDetail,
+    })
+    uploadImageVersion.mockResolvedValue(savedNewDetail)
+    listImageProjects.mockResolvedValue({
+      items: [
+        { id: 2, user_id: 1, title: 'new draft image', cover_version_id: 2, status: 'active', created_at: '', updated_at: '', version_count: 1 },
+        { id: 7, user_id: 1, title: 'Old image', cover_version_id: 7, status: 'active', created_at: '', updated_at: '', version_count: 1 },
+      ],
+      total: 2,
+      page: 1,
+      page_size: 50,
+      pages: 1,
+    })
+
+    const newConversation = wrapper.findAll('button').find((button) => button.text() === '新对话')
+    await newConversation!.trigger('click')
+    await wrapper.find('textarea').setValue('new draft image')
+    await wrapper.find('[data-testid="generate-image"]').trigger('click')
+
+    const oldProject = wrapper.findAll('button').find((button) => button.text() === 'Old image')
+    await oldProject!.trigger('click')
+    await flushPromises()
+    generation.resolve({ images: [{ url: 'data:image/png;base64,ZHJhZnQ=' }], raw: {} })
+    await flushPromises()
+
+    const form = uploadImageVersion.mock.calls.at(-1)?.[0] as FormData
+    expect(form.has('project_id')).toBe(false)
+    expect(wrapper.find('img[alt="generated-image-7"]').exists()).toBe(true)
+    expect(wrapper.find('img[alt="generated-image-2"]').exists()).toBe(false)
+  })
+
+  it('does not abort an in-flight generation when leaving the page', async () => {
+    const generation = deferred<{ images: Array<{ url: string }>; raw: Record<string, never> }>()
+    generateImage.mockReturnValue(generation.promise)
+    const wrapper = await mountView()
+
+    await wrapper.find('textarea').setValue('persist this image')
+    await wrapper.find('[data-testid="generate-image"]').trigger('click')
+    const signal = generateImage.mock.calls.at(-1)?.[2]?.signal as AbortSignal
+
+    wrapper.unmount()
+
+    expect(signal.aborted).toBe(false)
   })
 })

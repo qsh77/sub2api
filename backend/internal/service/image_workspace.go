@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 )
@@ -15,6 +16,8 @@ const (
 	ImageWorkspaceModeEdit       = "edit"
 	ImageWorkspaceModeMaskEdit   = "mask_edit"
 	ImageWorkspaceModeUpload     = "upload"
+
+	imageWorkspaceProjectTitleMaxBytes = 160
 )
 
 type ImageProject struct {
@@ -289,9 +292,20 @@ func imageWorkspaceTitleFromPrompt(prompt string) string {
 	if title == "" {
 		return "Untitled image"
 	}
-	runes := []rune(title)
-	if len(runes) <= 80 {
+	if len(title) <= imageWorkspaceProjectTitleMaxBytes {
 		return title
 	}
-	return string(runes[:80])
+	end := 0
+	for end < len(title) {
+		_, size := utf8.DecodeRuneInString(title[end:])
+		if end+size > imageWorkspaceProjectTitleMaxBytes {
+			break
+		}
+		end += size
+	}
+	title = strings.TrimSpace(title[:end])
+	if title == "" {
+		return "Untitled image"
+	}
+	return title
 }

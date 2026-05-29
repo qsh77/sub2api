@@ -55,10 +55,10 @@
         </header>
 
         <main ref="chatEl" class="flex-1 space-y-8 py-8 pb-36">
-          <div v-if="chatItems.length === 0 && pendingMessages.length === 0 && !generating" class="flex min-h-[45vh] items-center justify-center text-center">
+          <div v-if="chatItems.length === 0 && visiblePendingMessages.length === 0 && !uploadPreviewUrl && !generating" class="flex min-h-[45vh] items-center justify-center text-center">
             <div class="max-w-md">
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">想生成什么图片？</h2>
-              <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">直接输入一句话。生成后可以继续点图片上的编辑或局部编辑。</p>
+              <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">直接输入一句话。生成后继续描述要怎么改。</p>
             </div>
           </div>
 
@@ -89,15 +89,12 @@
                 <img
                   :src="versionSrc(item.version)"
                   :alt="`generated-image-${item.version.id}`"
-                  class="max-h-[460px] w-full max-w-[560px] object-contain"
-                  @click="selectVersionForFollowUp(item.version.id)"
+                  class="max-h-[460px] w-full max-w-[560px] cursor-pointer object-contain"
+                  @click="selectVersionForEdit(item.version.id)"
                 />
-                <div class="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 p-4">
-                  <button type="button" class="rounded-full bg-black/55 px-4 py-2 text-sm font-medium text-white backdrop-blur" @click.stop="selectVersionForFollowUp(item.version.id)">
-                    继续改
-                  </button>
+                <div class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-3 p-3">
                   <div class="flex items-center gap-2">
-                    <a class="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur" title="下载" :href="versionSrc(item.version)" :download="`image-${item.version.id}.png`" @click.stop>
+                    <a class="flex h-8 w-8 items-center justify-center rounded-full bg-black/35 text-sm text-white/80 backdrop-blur hover:bg-black/45 hover:text-white" title="下载" :href="versionSrc(item.version)" :download="`image-${item.version.id}.png`" @click.stop>
                       ⇩
                     </a>
                   </div>
@@ -106,10 +103,21 @@
             </div>
           </template>
 
-          <template v-for="message in pendingMessages" :key="message.id">
+          <div v-if="uploadPreviewUrl" class="flex justify-end">
+            <figure class="overflow-hidden rounded-[2rem] bg-gray-100 shadow-sm dark:bg-dark-800">
+              <img :src="uploadPreviewUrl" alt="selected-upload-image" class="max-h-72 w-full max-w-[280px] object-contain" />
+            </figure>
+          </div>
+
+          <template v-for="message in visiblePendingMessages" :key="message.id">
             <div class="flex justify-end">
-              <div class="max-w-[82%] rounded-[1.5rem] bg-gray-900 px-5 py-3 text-sm leading-6 text-white shadow-sm">
-                {{ message.prompt }}
+              <div class="flex max-w-[82%] flex-col items-end gap-3">
+                <figure v-for="(image, index) in message.sourceImages" :key="`${message.id}-source-${index}`" class="overflow-hidden rounded-[2rem] bg-gray-100 shadow-sm dark:bg-dark-800">
+                  <img :src="image.url" :alt="`uploaded-source-image-${index + 1}`" class="max-h-72 w-full max-w-[280px] object-contain" />
+                </figure>
+                <div v-if="message.prompt" class="rounded-[1.5rem] bg-gray-900 px-5 py-3 text-sm leading-6 text-white shadow-sm">
+                  {{ message.prompt }}
+                </div>
               </div>
             </div>
             <div class="max-w-3xl">
@@ -135,36 +143,27 @@
         </main>
       </div>
 
-      <footer class="sticky bottom-0 z-30 border-t border-gray-100 bg-white/95 px-4 py-4 backdrop-blur dark:border-dark-800 dark:bg-dark-950/95">
-        <div class="mx-auto w-full max-w-6xl">
+      <footer class="sticky bottom-0 z-30 border-t border-gray-100 bg-white/95 px-4 py-3 backdrop-blur dark:border-dark-800 dark:bg-dark-950/95">
+        <div class="mx-auto w-full max-w-3xl">
           <p v-if="unavailableMessage" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ unavailableMessage }}</p>
           <p v-if="errorText" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ errorText }}</p>
-          <p v-if="uploadFile" class="mb-3 text-sm text-gray-500 dark:text-dark-400">待上传：{{ uploadFile.name }}</p>
-          <p v-if="followUpLabel" class="mb-3 flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-dark-400">
-            <span>{{ followUpLabel }}</span>
-            <button type="button" class="font-medium text-gray-900 hover:underline dark:text-white" @click="clearFollowUp">
-              取消修改
-            </button>
-          </p>
-
-          <div class="flex items-end gap-3 rounded-[2rem] border border-gray-200 bg-white p-3 shadow-lg dark:border-dark-700 dark:bg-dark-900">
+          <div class="flex items-end gap-2.5 rounded-[1.75rem] border border-gray-200 bg-white p-2 shadow-lg dark:border-dark-700 dark:bg-dark-900">
             <input ref="fileInputEl" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="onUploadFile" />
-            <button type="button" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-2xl text-gray-800 hover:bg-gray-100 dark:text-dark-100 dark:hover:bg-dark-800" @click="fileInputEl?.click()">
+            <button type="button" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl text-gray-800 hover:bg-gray-100 dark:text-dark-100 dark:hover:bg-dark-800" @click="fileInputEl?.click()">
               +
             </button>
             <textarea
               ref="promptEl"
               v-model="prompt"
               rows="1"
-              class="max-h-40 min-h-11 flex-1 resize-none border-0 bg-transparent px-1 py-2 text-base text-gray-900 outline-none placeholder:text-gray-400 dark:text-white"
-              :placeholder="composerPlaceholder"
+              class="max-h-36 min-h-10 flex-1 resize-none border-0 bg-transparent px-1 py-1.5 text-base text-gray-900 outline-none placeholder:text-gray-400 dark:text-white"
               :disabled="generating"
               @keydown.enter.exact.prevent="run"
             />
             <button
               :data-testid="isAdmin ? 'admin-generate-image' : 'generate-image'"
               type="button"
-              class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-900 text-white disabled:cursor-not-allowed disabled:bg-gray-300 dark:bg-white dark:text-gray-900 dark:disabled:bg-dark-700"
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-900 text-white disabled:cursor-not-allowed disabled:bg-gray-300 dark:bg-white dark:text-gray-900 dark:disabled:bg-dark-700"
               :disabled="!canRun"
               @click="run"
             >
@@ -190,10 +189,12 @@ import {
   filterImageModels,
   generateImage,
   getImageProject,
+  imageBillingTierForSize,
   imageVersionFileUrl,
   IMAGE_SIZE_OPTIONS,
   listImageProjects,
   resolveKeyImageState,
+  supportsImageWorkspaceModel,
   uploadImageVersion,
   DEFAULT_IMAGE_MODELS,
   type GeneratedImage,
@@ -208,7 +209,7 @@ import type { AdminGroup, ApiKey } from '@/types'
 
 type WorkspaceScope = 'user' | 'admin'
 type WorkspaceMode = 'generate' | 'edit' | 'upload'
-type PendingMessageStatus = 'thinking' | 'saving'
+type PendingMessageStatus = 'thinking' | 'saving' | 'failed'
 
 interface ThoughtStep {
   label: string
@@ -222,11 +223,18 @@ interface ThoughtRecord {
 
 interface PendingMessage {
   id: string
+  projectId: number | null
   prompt: string
   action: WorkspaceMode
   status: PendingMessageStatus
   seconds: number
+  sourceImages: GeneratedImage[]
   images: GeneratedImage[]
+}
+
+interface SaveContext {
+  projectId: number | null
+  sourceVersion: ImageWorkspaceVersion | null
 }
 
 const props = defineProps<{ scope: WorkspaceScope }>()
@@ -248,6 +256,7 @@ const model = ref('')
 const size = ref<ImageSizeOption>(IMAGE_SIZE_OPTIONS[0].value)
 const prompt = ref('')
 const uploadFile = ref<File | null>(null)
+const uploadPreviewUrl = ref('')
 const pendingMessages = ref<PendingMessage[]>([])
 const versionObjectUrls = ref<Record<number, string>>({})
 const versionThoughts = ref<Record<number, ThoughtRecord>>(readStoredThoughts())
@@ -278,19 +287,22 @@ const sizeOptions = computed(() => IMAGE_SIZE_OPTIONS.map((item) => ({
 const currentModels = computed<string[]>(() => {
   if (!isAdmin.value) return models.value
   const groupModels = selectedAdminGroup.value?.models_list_config?.models?.filter(Boolean) || []
-  return groupModels.length > 0 ? groupModels : [...DEFAULT_IMAGE_MODELS]
+  const supportedModels = groupModels.filter(supportsImageWorkspaceModel)
+  return supportedModels.length > 0 ? supportedModels : [...DEFAULT_IMAGE_MODELS]
 })
 const chatItems = computed(() => (selectedDetail.value?.versions || []).map((version) => ({
   version,
   prompt: version.prompt || modeLabel(version.mode),
 })))
+const visiblePendingMessages = computed(() => pendingMessages.value.filter((message) => message.projectId === selectedProjectId.value))
 const effectiveMode = computed<WorkspaceMode>(() => {
   if (uploadFile.value) return 'upload'
   if (selectedVersion.value) return 'edit'
   return 'generate'
 })
+const uploadPromptEdit = computed(() => !!uploadFile.value && !!trimmedPrompt.value)
 const unavailableMessage = computed(() => {
-  if (effectiveMode.value === 'upload') return ''
+  if (effectiveMode.value === 'upload' && !uploadPromptEdit.value) return ''
   if (!selectedKey.value) return activeKeys.value.length === 0 ? '没有可用 API 密钥' : ''
   if (keyState.value.reason === 'missing_group') return '当前密钥没有分组'
   if (keyState.value.reason === 'unsupported_platform') return '当前分组不是 OpenAI 平台'
@@ -300,21 +312,14 @@ const unavailableMessage = computed(() => {
 })
 const canRun = computed(() => {
   if (generating.value) return false
-  if (effectiveMode.value === 'upload') return !!uploadFile.value
+  if (effectiveMode.value === 'upload') {
+    if (!uploadPromptEdit.value) return !!uploadFile.value
+    return !!selectedKey.value && !!keyState.value.allowed && !!model.value
+  }
   if (!selectedKey.value || !keyState.value.allowed || !model.value || !trimmedPrompt.value) return false
   if (effectiveMode.value === 'edit') return !!selectedVersion.value
   return true
 })
-const composerPlaceholder = computed(() => {
-  if (effectiveMode.value === 'edit') return '直接说要怎么修改这张图'
-  if (effectiveMode.value === 'upload') return '上传后可补充一句说明'
-  return '有问题，尽管问'
-})
-const followUpLabel = computed(() => {
-  if (!selectedVersion.value || uploadFile.value) return ''
-  return `正在修改：image-${selectedVersion.value.id}`
-})
-
 watch(groups, (items) => {
   if (!items.some((item) => item.id === Number(selectedGroupId.value))) selectedGroupId.value = items[0]?.id || null
 })
@@ -327,7 +332,7 @@ watch(activeKeys, (items) => {
 watch(currentModels, (items) => {
   if (!items.includes(model.value)) model.value = items[0] || ''
 }, { immediate: true })
-watch([chatItems, pendingMessages, generating], () => {
+watch([chatItems, visiblePendingMessages, uploadPreviewUrl, generating], () => {
   void nextTick(() => chatEl.value?.scrollIntoView?.({ block: 'end' }))
 })
 
@@ -381,6 +386,7 @@ async function loadWorkspace() {
 }
 
 async function selectProject(id: number) {
+  clearComposerDraft()
   selectedProjectId.value = id
   selectedDetail.value = isAdmin.value ? await adminAPI.images.get(id) : await getImageProject(id)
   if (!selectedDetail.value.versions.some((item) => item.id === selectedVersionId.value)) {
@@ -394,39 +400,61 @@ function startNewProject() {
   selectedDetail.value = null
   pendingMessages.value = []
   expandedThoughtKey.value = null
-  uploadFile.value = null
-  prompt.value = ''
+  clearComposerDraft()
   void nextTick(() => promptEl.value?.focus())
 }
 
-function selectVersionForFollowUp(versionId: number) {
+function selectVersionForEdit(versionId: number) {
+  clearUploadFile()
   selectedVersionId.value = versionId
   prompt.value = ''
   expandedThoughtKey.value = null
   void nextTick(() => promptEl.value?.focus())
 }
 
-function clearFollowUp() {
-  selectedVersionId.value = null
-  void nextTick(() => promptEl.value?.focus())
+function buildEditPrompt(value: string) {
+  return [
+    '基于提供的原图做编辑，保持原图主体、构图、轮廓、画布比例、背景和图标风格不变。',
+    '只修改用户要求的内容；除非用户明确要求，否则不要新增人物、场景、文字或无关元素，也不要重画成新图。',
+    `用户要求：${value}`,
+  ].join('\n')
 }
 
 async function run() {
   if (!canRun.value) return
   const action = effectiveMode.value
-  const promptText = trimmedPrompt.value || uploadFile.value?.name || ''
-  const pending = addPendingMessage(promptText, action)
+  const saveContext: SaveContext = {
+    projectId: selectedProjectId.value,
+    sourceVersion: selectedVersion.value,
+  }
+  const uploadSource = uploadFile.value
+  const editUploadedImage = action === 'upload' && !!uploadSource && !!trimmedPrompt.value
+  const promptText = trimmedPrompt.value || uploadSource?.name || ''
+  const uploadSourceImages = uploadSource && uploadPreviewUrl.value
+    ? [{ url: uploadPreviewUrl.value, mimeType: uploadSource.type }]
+    : []
+  const pending = addPendingMessage(promptText, editUploadedImage ? 'edit' : action, saveContext.projectId, uploadSourceImages)
   prompt.value = ''
+  if (uploadSource) clearUploadFile({ revoke: false })
   generating.value = true
   startPendingTimer()
   controller?.abort()
   controller = new AbortController()
   try {
     errorText.value = ''
-    if (action === 'upload') {
-      pending.images = [{ url: URL.createObjectURL(uploadFile.value!), mimeType: uploadFile.value!.type }]
-      await saveBlob(uploadFile.value!, 'upload', promptText, pending)
-      uploadFile.value = null
+    if (editUploadedImage) {
+      const result = await editImage(selectedKey.value!.key, {
+        model: model.value,
+        prompt: promptText,
+        image: uploadSource,
+        size: size.value,
+        n: 1,
+        response_format: 'b64_json',
+      }, { signal: controller.signal })
+      finishThinking(pending, result.images)
+      await saveImages(result.images, 'edit', promptText, pending, saveContext, false)
+    } else if (action === 'upload') {
+      await saveBlob(uploadSource!, 'upload', promptText, pending, saveContext)
     } else if (action === 'generate') {
       const result = await generateImage(selectedKey.value!.key, {
         model: model.value,
@@ -436,25 +464,26 @@ async function run() {
         response_format: 'b64_json',
       }, { signal: controller.signal })
       finishThinking(pending, result.images)
-      await saveImages(result.images, 'generation', promptText, pending)
+      await saveImages(result.images, 'generation', promptText, pending, saveContext)
     } else {
-      const source = await fetchVersionBlob(selectedVersion.value!)
+      const source = await fetchVersionBlob(saveContext.sourceVersion!)
       const result = await editImage(selectedKey.value!.key, {
         model: model.value,
-        prompt: promptText,
+        prompt: buildEditPrompt(promptText),
         image: source,
         size: size.value,
         n: 1,
         response_format: 'b64_json',
       }, { signal: controller.signal })
       finishThinking(pending, result.images)
-      await saveImages(result.images, 'edit', promptText, pending)
+      await saveImages(result.images, 'edit', promptText, pending, saveContext)
     }
     removePendingMessage(pending.id)
     appStore.showSuccess?.('图片已保存')
   } catch (err: unknown) {
     if ((err as Error)?.name !== 'AbortError') {
       const message = readErrorText(err)
+      settleFailedPending(pending.id)
       errorText.value = message
       appStore.showError(message)
     }
@@ -465,24 +494,24 @@ async function run() {
   }
 }
 
-async function saveImages(images: GeneratedImage[], savedMode: 'generation' | 'edit', promptText: string, pending: PendingMessage) {
+async function saveImages(images: GeneratedImage[], savedMode: 'generation' | 'edit', promptText: string, pending: PendingMessage, saveContext: SaveContext, linkSelectedVersion = true) {
   for (const image of images) {
     const blob = image.url.startsWith('data:') ? dataUrlToBlob(image.url) : await fetch(image.url).then((res) => res.blob())
-    await saveBlob(blob, savedMode, promptText, pending)
+    await saveBlob(blob, savedMode, promptText, pending, saveContext, linkSelectedVersion)
   }
 }
 
-async function saveBlob(blob: Blob, savedMode: 'generation' | 'edit' | 'upload', promptText: string, pending: PendingMessage) {
+async function saveBlob(blob: Blob, savedMode: 'generation' | 'edit' | 'upload', promptText: string, pending: PendingMessage, saveContext: SaveContext, linkSelectedVersion = true) {
   const form = new FormData()
   form.append('image', blob, 'image.png')
   form.append('mode', savedMode)
   form.append('prompt', promptText)
   form.append('model', model.value)
   form.append('size', size.value)
-  if (selectedProjectId.value) form.append('project_id', String(selectedProjectId.value))
-  if (selectedVersion.value && savedMode !== 'generation' && savedMode !== 'upload') {
-    form.append('parent_version_id', String(selectedVersion.value.id))
-    form.append('source_version_id', String(selectedVersion.value.id))
+  if (saveContext.projectId) form.append('project_id', String(saveContext.projectId))
+  if (linkSelectedVersion && saveContext.sourceVersion && savedMode !== 'generation' && savedMode !== 'upload') {
+    form.append('parent_version_id', String(saveContext.sourceVersion.id))
+    form.append('source_version_id', String(saveContext.sourceVersion.id))
   }
   const detail = await uploadImageVersion(form)
   await loadVersionImages(detail.versions)
@@ -490,9 +519,11 @@ async function saveBlob(blob: Blob, savedMode: 'generation' | 'edit' | 'upload',
   if (savedVersion) {
     saveThoughtRecord(savedVersion.id, buildThoughtRecord(pending, savedVersion, savedMode))
   }
-  selectedProjectId.value = detail.project.id
-  selectedDetail.value = detail
-  selectedVersionId.value = detail.versions.at(-1)?.id || null
+  if (shouldShowSavedDetail(saveContext)) {
+    selectedProjectId.value = detail.project.id
+    selectedDetail.value = detail
+    selectedVersionId.value = detail.versions.at(-1)?.id || null
+  }
   const result = isAdmin.value
     ? await adminAPI.images.list({ page: 1, page_size: 50 })
     : await listImageProjects({ page: 1, page_size: 50 })
@@ -500,7 +531,7 @@ async function saveBlob(blob: Blob, savedMode: 'generation' | 'edit' | 'upload',
 }
 
 function onUploadFile(event: Event) {
-  uploadFile.value = (event.target as HTMLInputElement).files?.[0] || null
+  setUploadFile((event.target as HTMLInputElement).files?.[0] || null)
 }
 
 function versionSrc(version: ImageWorkspaceVersion) {
@@ -518,13 +549,15 @@ function preferredProjectId(items: ImageWorkspaceProjectSummary[]) {
   return items.find((project) => project.version_count > 0)?.id || items[0]?.id || null
 }
 
-function addPendingMessage(promptText: string, action: WorkspaceMode) {
+function addPendingMessage(promptText: string, action: WorkspaceMode, projectId: number | null, sourceImages: GeneratedImage[] = []) {
   const message = {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    projectId,
     prompt: promptText || modeLabel(action),
     action,
     status: action === 'upload' ? 'saving' : 'thinking',
     seconds: 0,
+    sourceImages,
     images: [] as GeneratedImage[],
   } satisfies PendingMessage
   pendingMessages.value.push(message)
@@ -533,16 +566,56 @@ function addPendingMessage(promptText: string, action: WorkspaceMode) {
 
 function removePendingMessage(id: string) {
   const message = pendingMessages.value.find((item) => item.id === id)
-  message?.images.forEach((image) => {
-    if (image.url.startsWith('blob:')) URL.revokeObjectURL(image.url)
-  })
+  message?.sourceImages.forEach(revokeGeneratedImageUrl)
+  message?.images.forEach(revokeGeneratedImageUrl)
   pendingMessages.value = pendingMessages.value.filter((item) => item.id !== id)
+}
+
+function settleFailedPending(id: string) {
+  const message = pendingMessages.value.find((item) => item.id === id)
+  if (!message) return
+  if (message.images.length === 0 && message.sourceImages.length === 0) {
+    removePendingMessage(id)
+    return
+  }
+  pendingMessages.value = pendingMessages.value.map((item) => item.id === id
+    ? { ...item, status: 'failed' }
+    : item)
 }
 
 function finishThinking(message: PendingMessage, images: GeneratedImage[]) {
   pendingMessages.value = pendingMessages.value.map((item) => item.id === message.id
     ? { ...item, status: 'saving', images }
     : item)
+}
+
+function setUploadFile(file: File | null) {
+  clearUploadFile()
+  uploadFile.value = file
+  uploadPreviewUrl.value = file ? URL.createObjectURL(file) : ''
+}
+
+function clearUploadFile(options: { revoke?: boolean } = {}) {
+  const shouldRevoke = options.revoke !== false
+  if (shouldRevoke && uploadPreviewUrl.value) URL.revokeObjectURL(uploadPreviewUrl.value)
+  uploadFile.value = null
+  uploadPreviewUrl.value = ''
+  if (fileInputEl.value) fileInputEl.value.value = ''
+}
+
+function revokeGeneratedImageUrl(image: GeneratedImage) {
+  if (image.url.startsWith('blob:')) URL.revokeObjectURL(image.url)
+}
+
+function clearComposerDraft() {
+  clearUploadFile()
+  prompt.value = ''
+  expandedThoughtKey.value = null
+  errorText.value = ''
+}
+
+function shouldShowSavedDetail(saveContext: SaveContext) {
+  return selectedProjectId.value === saveContext.projectId
 }
 
 function startPendingTimer() {
@@ -560,6 +633,7 @@ function stopPendingTimer() {
 }
 
 function pendingLabel(message: PendingMessage) {
+  if (message.status === 'failed') return '保存失败 ›'
   if (message.action === 'upload') return '上传图片 ›'
   return `Thought for ${message.seconds}s ›`
 }
@@ -597,7 +671,7 @@ function pendingThoughtSteps(message: PendingMessage): ThoughtStep[] {
     { label: '收到提示', detail: message.prompt },
     { label: message.action === 'upload' ? '上传图片' : modeLabel(message.action), detail: [model.value, sizeLabel(size.value)].filter(Boolean).join(' · ') },
   ]
-  steps.push({ label: message.status === 'thinking' ? '正在生成图片' : '正在保存结果' })
+  steps.push({ label: message.status === 'thinking' ? '正在生成图片' : message.status === 'failed' ? '保存失败' : '正在保存结果' })
   return steps
 }
 
@@ -651,11 +725,14 @@ function imageSizeOptionLabel(option: (typeof IMAGE_SIZE_OPTIONS)[number]) {
 function imageSizePrice(value: ImageSizeOption) {
   const group = selectedGroup.value
   if (!group) return null
-  const basePrice = {
-    '1024x1024': group.image_price_1k,
-    '1536x1536': group.image_price_2k,
-    '2048x2048': group.image_price_4k,
-  }[value]
+  const tier = imageBillingTierForSize(value)
+  const basePrice = tier === '1K'
+    ? group.image_price_1k
+    : tier === '2K'
+      ? group.image_price_2k
+      : tier === '4K'
+        ? group.image_price_4k
+        : null
   if (basePrice === null || basePrice === undefined) return null
   const multiplier = group.image_rate_independent ? group.image_rate_multiplier : group.rate_multiplier
   const price = Number(basePrice) * (Number.isFinite(Number(multiplier)) ? Number(multiplier) : 1)
@@ -699,13 +776,12 @@ function readErrorText(err: unknown): string {
 
 onMounted(loadData)
 onBeforeUnmount(() => {
-  controller?.abort()
   stopPendingTimer()
+  clearUploadFile()
   Object.values(versionObjectUrls.value).forEach((url) => URL.revokeObjectURL(url))
   pendingMessages.value.forEach((message) => {
-    message.images.forEach((image) => {
-      if (image.url.startsWith('blob:')) URL.revokeObjectURL(image.url)
-    })
+    message.sourceImages.forEach(revokeGeneratedImageUrl)
+    message.images.forEach(revokeGeneratedImageUrl)
   })
 })
 </script>
