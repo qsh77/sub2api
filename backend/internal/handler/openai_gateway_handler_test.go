@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -174,7 +175,11 @@ func TestOpenAIEnsureForwardErrorResponse_WritesFallbackWhenNotWritten(t *testin
 	assert.Equal(t, "Upstream request failed", errorObj["message"])
 }
 
-func TestOpenAIEnsureForwardErrorResponse_DoesNotOverrideWrittenResponse(t *testing.T) {
+// Writer 已写后 ensureForwardErrorResponse 必须仍然把错误信息以 SSE
+// 形式追加给客户端（streamStarted 强制 true）。
+// 这是 case B 修复：旧实现遇到 Writer.Written 直接 return false，
+// 客户端只能拿到 silent EOF；Codex CLI 报 "stream closed before response.completed"。
+func TestOpenAIEnsureForwardErrorResponse_AppendsSSEAfterWritten(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -184,9 +189,34 @@ func TestOpenAIEnsureForwardErrorResponse_DoesNotOverrideWrittenResponse(t *test
 	h := &OpenAIGatewayHandler{}
 	wrote := h.ensureForwardErrorResponse(c, false)
 
-	require.False(t, wrote)
+	require.True(t, wrote, "must attempt to communicate the failure to the client via SSE")
+	// 状态码改不了（headers 已 flush），但 body 应该追加 SSE 错误事件。
 	require.Equal(t, http.StatusTeapot, w.Code)
-	assert.Equal(t, "already written", w.Body.String())
+	assert.Contains(t, w.Body.String(), "already written")
+	// 非 /responses 路径走 legacy event: error 分支。
+	assert.Contains(t, w.Body.String(), "event: error\n")
+}
+
+// case B 回归测试：/responses 路径，Writer 已被写过（模拟 ping flushed），
+// ensureForwardErrorResponse 必须发 response.failed，让 Codex 收到合规终止事件。
+func TestOpenAIEnsureForwardErrorResponse_ResponsesRouteAfterWrittenEmitsResponseFailed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, EndpointResponses, nil)
+	// 模拟 ping 已 flush 的状态：Writer 已写过 1 个字节
+	_, _ = c.Writer.WriteString(":\n\n")
+
+	h := &OpenAIGatewayHandler{}
+	wrote := h.ensureForwardErrorResponse(c, false)
+
+	require.True(t, wrote)
+	body := w.Body.String()
+	assert.Contains(t, body, ":\n\n", "earlier ping bytes preserved")
+	assert.Contains(t, body, "event: response.failed\n", "appended a Responses terminal event")
+	assert.Contains(t, body, `"type":"response.failed"`)
+	assert.Contains(t, body, `"code":"upstream_error"`)
+	assert.Contains(t, body, "Upstream request failed")
 }
 
 func TestShouldLogOpenAIForwardFailureAsWarn(t *testing.T) {
@@ -266,7 +296,9 @@ func TestOpenAIRecoverResponsesPanic_NoPanicNoWrite(t *testing.T) {
 	assert.Equal(t, "", w.Body.String())
 }
 
-func TestOpenAIRecoverResponsesPanic_DoesNotOverrideWrittenResponse(t *testing.T) {
+// Panic 在已 flush 的 /v1/responses 流中：状态码无法改（已 written），
+// 但 body 应追加 response.failed 让客户端识别为合规截断而不是 silent EOF。
+func TestOpenAIRecoverResponsesPanic_AppendsResponseFailedAfterWritten(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	w := httptest.NewRecorder()
@@ -284,7 +316,9 @@ func TestOpenAIRecoverResponsesPanic_DoesNotOverrideWrittenResponse(t *testing.T
 	})
 
 	require.Equal(t, http.StatusTeapot, w.Code)
-	assert.Equal(t, "already written", w.Body.String())
+	body := w.Body.String()
+	assert.Contains(t, body, "already written")
+	assert.Contains(t, body, "event: response.failed\n")
 }
 
 func TestOpenAIMissingResponsesDependencies(t *testing.T) {
@@ -707,14 +741,29 @@ func (r *contentModerationHandlerSettingRepo) Delete(ctx context.Context, key st
 }
 
 type contentModerationHandlerTestRepo struct {
+	mu   sync.Mutex
 	logs []service.ContentModerationLog
 }
 
 func (r *contentModerationHandlerTestRepo) CreateLog(ctx context.Context, log *service.ContentModerationLog) error {
 	if log != nil {
+		r.mu.Lock()
+		defer r.mu.Unlock()
 		r.logs = append(r.logs, *log)
 	}
 	return nil
+}
+
+func (r *contentModerationHandlerTestRepo) resetLogs() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.logs = nil
+}
+
+func (r *contentModerationHandlerTestRepo) logSnapshot() []service.ContentModerationLog {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]service.ContentModerationLog(nil), r.logs...)
 }
 
 func (r *contentModerationHandlerTestRepo) ListLogs(ctx context.Context, filter service.ContentModerationLogFilter) ([]service.ContentModerationLog, *pagination.PaginationResult, error) {
@@ -775,7 +824,10 @@ func TestOpenAIResponsesWebSocket_ContentModerationBlocksFirstFrame(t *testing.T
 	})
 	require.NoError(t, err)
 	require.True(t, decision.Blocked)
-	repo.logs = nil
+	require.Eventually(t, func() bool {
+		return len(repo.logSnapshot()) == 1
+	}, time.Second, 10*time.Millisecond)
+	repo.resetLogs()
 	h := &OpenAIGatewayHandler{
 		gatewayService:           &service.OpenAIGatewayService{},
 		billingCacheService:      &service.BillingCacheService{},
@@ -815,10 +867,14 @@ func TestOpenAIResponsesWebSocket_ContentModerationBlocksFirstFrame(t *testing.T
 		require.Equal(t, coderws.StatusPolicyViolation, closeErr.Code)
 		require.Contains(t, closeErr.Reason, "内容审计测试阻断")
 	}
-	require.Len(t, repo.logs, 1)
-	require.True(t, repo.logs[0].Flagged)
-	require.Equal(t, service.ContentModerationActionBlock, repo.logs[0].Action)
-	require.Equal(t, "bad prompt", repo.logs[0].InputExcerpt)
+	var logs []service.ContentModerationLog
+	require.Eventually(t, func() bool {
+		logs = repo.logSnapshot()
+		return len(logs) == 1
+	}, time.Second, 10*time.Millisecond)
+	require.True(t, logs[0].Flagged)
+	require.Equal(t, service.ContentModerationActionBlock, logs[0].Action)
+	require.Equal(t, "bad prompt", logs[0].InputExcerpt)
 }
 
 func TestOpenAIResponsesWebSocket_PassthroughUsageLogPersistsUserAgentAndReasoningEffort(t *testing.T) {
@@ -1409,7 +1465,7 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 		}, nil, nil, nil)
 	}
 
-	billingCacheSvc := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg)
+	billingCacheSvc := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
 	gatewaySvc := service.NewOpenAIGatewayService(
 		accountRepo,
 		usageRepo,
@@ -1431,6 +1487,7 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 		channelSvc,
 		nil,
 		nil,
+		nil, // userPlatformQuotaRepo
 	)
 
 	cache := &concurrencyCacheMock{

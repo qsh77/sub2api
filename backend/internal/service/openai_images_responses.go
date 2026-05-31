@@ -318,15 +318,13 @@ func buildOpenAIImagesResponsesRequest(parsed *OpenAIImagesRequest, toolModel st
 	}
 	req, _ = sjson.SetRawBytes(req, "input", input)
 
-	tool := []byte(`{"type":"image_generation","model":""}`)
-	tool, _ = sjson.SetBytes(tool, "model", strings.TrimSpace(toolModel))
-	if strings.EqualFold(strings.TrimSpace(toolModel), "gpt-image-2") {
-		action := "generate"
-		if parsed.IsEdits() {
-			action = "edit"
-		}
-		tool, _ = sjson.SetBytes(tool, "action", action)
+	action := "generate"
+	if parsed.IsEdits() {
+		action = "edit"
 	}
+	tool := []byte(`{"type":"image_generation","action":"","model":""}`)
+	tool, _ = sjson.SetBytes(tool, "action", action)
+	tool, _ = sjson.SetBytes(tool, "model", strings.TrimSpace(toolModel))
 	if shouldPassOpenAIImagesN(toolModel, parsed.N) {
 		tool, _ = sjson.SetBytes(tool, "n", parsed.N)
 	}
