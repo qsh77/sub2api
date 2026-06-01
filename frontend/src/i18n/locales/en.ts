@@ -361,6 +361,7 @@ export default {
     groups: 'Groups',
     channels: 'Channels',
     availableChannels: 'Available Channels',
+    aiChat: 'AI Chat',
     imageGeneration: 'Image Generation',
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
@@ -1038,6 +1039,15 @@ export default {
       intervals: 'Tiered Pricing',
       unitPerMillion: '/ 1M tokens',
       unitPerRequest: '/ request'
+    }
+  },
+
+  aiChat: {
+    title: 'AI Chat',
+    description: 'Chat by selecting a group, key, and model',
+    admin: {
+      title: 'AI Chat',
+      description: 'Chat by selecting a group, key, and model'
     }
   },
 

@@ -205,6 +205,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/chat',
+    name: 'AiChat',
+    component: () => import('@/views/user/AiChatView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'AI Chat',
+      titleKey: 'aiChat.title',
+      descriptionKey: 'aiChat.description'
+    }
+  },
+  {
     path: '/usage',
     name: 'Usage',
     component: () => import('@/views/user/UsageView.vue'),
@@ -498,6 +510,18 @@ const routes: RouteRecordRaw[] = [
       title: 'Account Management',
       titleKey: 'admin.accounts.title',
       descriptionKey: 'admin.accounts.description'
+    }
+  },
+  {
+    path: '/admin/chat',
+    name: 'AdminAiChat',
+    component: () => import('@/views/admin/AiChatView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'AI Chat',
+      titleKey: 'aiChat.admin.title',
+      descriptionKey: 'aiChat.admin.description'
     }
   },
   {
