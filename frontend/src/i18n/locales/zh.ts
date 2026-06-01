@@ -361,6 +361,7 @@ export default {
     groups: '分组管理',
     channels: '渠道管理',
     availableChannels: '可用渠道',
+    aiChat: 'AI 聊天',
     imageGeneration: '图片生成',
     subscriptions: '订阅管理',
     accounts: '账号管理',
@@ -1042,6 +1043,15 @@ export default {
       intervals: '阶梯定价',
       unitPerMillion: '/ 1M token',
       unitPerRequest: '/ 次'
+    }
+  },
+
+  aiChat: {
+    title: 'AI 聊天',
+    description: '选择分组、密钥和模型进行对话',
+    admin: {
+      title: 'AI 聊天',
+      description: '选择分组、密钥和模型进行对话'
     }
   },
 
