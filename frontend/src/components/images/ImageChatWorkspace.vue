@@ -278,7 +278,7 @@ const keyState = computed(() => isAdmin.value ? { allowed: !!selectedKey.value, 
 const selectedVersion = computed<ImageWorkspaceVersion | null>(() => selectedDetail.value?.versions.find((item) => item.id === selectedVersionId.value) || null)
 const trimmedPrompt = computed(() => prompt.value.trim())
 const groupOptions = computed(() => groups.value.map((item) => ({ value: item.id, label: item.name })))
-const keyOptions = computed(() => activeKeys.value.map((item) => ({ value: item.key, label: item.name })))
+const keyOptions = computed(() => activeKeys.value.map((item) => ({ value: item.key, label: apiKeyOptionLabel(item) })))
 const modelOptions = computed(() => currentModels.value.map((item) => ({ value: item, label: item })))
 const sizeOptions = computed(() => IMAGE_SIZE_OPTIONS.map((item) => ({
   ...item,
@@ -303,7 +303,9 @@ const effectiveMode = computed<WorkspaceMode>(() => {
 const uploadPromptEdit = computed(() => !!uploadFile.value && !!trimmedPrompt.value)
 const unavailableMessage = computed(() => {
   if (effectiveMode.value === 'upload' && !uploadPromptEdit.value) return ''
-  if (!selectedKey.value) return activeKeys.value.length === 0 ? '没有可用 API 密钥' : ''
+  if (!selectedKey.value) return activeKeys.value.length === 0
+    ? (isAdmin.value ? '没有可用 API 密钥' : '没有可用的 OpenAI 生图分组密钥')
+    : ''
   if (keyState.value.reason === 'missing_group') return '当前密钥没有分组'
   if (keyState.value.reason === 'unsupported_platform') return '当前分组不是 OpenAI 平台'
   if (keyState.value.reason === 'image_disabled') return '当前分组未启用图片生成'
@@ -350,7 +352,7 @@ async function loadData() {
         keysAPI.list(1, 100, { status: 'active' }),
         userChannelsAPI.getAvailable(),
       ])
-      activeKeys.value = keys.items.filter((item) => item.status === 'active')
+      activeKeys.value = keys.items.filter(isUserImageKeyAvailable)
       models.value = filterImageModels(channels.flatMap((channel) => channel.platforms.flatMap((platform) => platform.supported_models)))
     }
     await loadWorkspace()
@@ -720,6 +722,14 @@ function sizeLabel(value: string) {
 function imageSizeOptionLabel(option: (typeof IMAGE_SIZE_OPTIONS)[number]) {
   const price = imageSizePrice(option.value)
   return price === null ? option.label : `${option.label} · ${formatImagePrice(price)}`
+}
+
+function apiKeyOptionLabel(key: ApiKey) {
+  return key.group?.name ? `${key.name} · ${key.group.name}` : key.name
+}
+
+function isUserImageKeyAvailable(key: ApiKey) {
+  return key.status === 'active' && resolveKeyImageState(key.group).allowed
 }
 
 function imageSizePrice(value: ImageSizeOption) {

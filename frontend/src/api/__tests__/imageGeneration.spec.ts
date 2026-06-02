@@ -101,6 +101,21 @@ describe('imageGeneration API', () => {
     })).rejects.toThrow('Image generation is disabled for this group')
   })
 
+  it('rejects successful responses without image data', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [] }),
+    }))
+
+    await expect(generateImage('sk-test', {
+      model: 'gpt-image-2',
+      prompt: 'draw',
+      size: '1024x1024',
+      n: 1,
+      response_format: 'b64_json',
+    })).rejects.toThrow('响应里没有图片数据')
+  })
+
   it('builds download href for normalized images', () => {
     expect(imageToDownloadHref({ url: 'data:image/png;base64,aGVsbG8=' })).toBe('data:image/png;base64,aGVsbG8=')
     expect(imageToDownloadHref({ url: 'https://example.com/image.png' })).toBe('https://example.com/image.png')

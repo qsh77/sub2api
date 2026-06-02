@@ -215,6 +215,7 @@ describe('ImageGenerationView', () => {
     ])
 
     expect(wrapper.text()).toContain('Enabled key')
+    expect(wrapper.text()).toContain('OpenAI Images')
     expect(wrapper.text()).not.toContain('Inactive key')
     expect(list).toHaveBeenCalledWith(1, 100, { status: 'active' })
 
@@ -223,7 +224,39 @@ describe('ImageGenerationView', () => {
     expect(wrapper.find('[data-testid="generate-image"]').attributes('disabled')).toBeUndefined()
   })
 
-  it('disables generation when image generation is disabled for selected group', async () => {
+  it('selects an image-enabled key when other active keys cannot generate images', async () => {
+    generateImage.mockResolvedValue({
+      images: [{ url: 'data:image/png;base64,aGVsbG8=' }],
+      raw: {},
+    })
+    const wrapper = await mountView([
+      apiKey({
+        id: 1,
+        key: 'sk-disabled',
+        name: 'Disabled key',
+        group: { ...activeGroup, name: 'No Images', allow_image_generation: false },
+      }),
+      apiKey({
+        id: 2,
+        key: 'sk-enabled',
+        name: 'Enabled key',
+      }),
+    ])
+
+    expect(wrapper.text()).not.toContain('Disabled key')
+    expect(wrapper.text()).toContain('Enabled key')
+
+    await wrapper.find('textarea').setValue('a city at dusk')
+    await wrapper.find('[data-testid="generate-image"]').trigger('click')
+    await flushPromises()
+
+    expect(generateImage).toHaveBeenCalledWith('sk-enabled', expect.objectContaining({
+      model: 'gpt-image-2',
+      prompt: 'a city at dusk',
+    }), expect.any(Object))
+  })
+
+  it('disables generation when there is no image-enabled group key', async () => {
     const wrapper = await mountView([
       apiKey({
         group: { ...activeGroup, allow_image_generation: false },
@@ -232,11 +265,11 @@ describe('ImageGenerationView', () => {
 
     await wrapper.find('textarea').setValue('a city at dusk')
 
-    expect(wrapper.text()).toContain('当前分组未启用图片生成')
+    expect(wrapper.text()).toContain('没有可用的 OpenAI 生图分组密钥')
     expect(wrapper.find('[data-testid="generate-image"]').attributes('disabled')).toBeDefined()
   })
 
-  it('disables generation when selected group is inactive', async () => {
+  it('disables generation when there is no active image group key', async () => {
     const wrapper = await mountView([
       apiKey({
         group: { ...activeGroup, status: 'suspended' },
@@ -245,7 +278,7 @@ describe('ImageGenerationView', () => {
 
     await wrapper.find('textarea').setValue('a city at dawn')
 
-    expect(wrapper.text()).toContain('当前分组未启用')
+    expect(wrapper.text()).toContain('没有可用的 OpenAI 生图分组密钥')
     expect(wrapper.find('[data-testid="generate-image"]').attributes('disabled')).toBeDefined()
   })
 

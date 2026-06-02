@@ -164,6 +164,13 @@ export function normalizeImageGenerationResponse(response: ImageGenerationRespon
   }
 }
 
+function requireGeneratedImages(result: NormalizedImageGenerationResult): NormalizedImageGenerationResult {
+  if (result.images.length === 0) {
+    throw new Error('图片生成接口已返回成功，但响应里没有图片数据')
+  }
+  return result
+}
+
 export async function generateImage(
   apiKey: string,
   payload: ImageGenerationRequest,
@@ -184,7 +191,7 @@ export async function generateImage(
     throw new Error(readErrorMessage(data) || `Image generation failed with status ${response.status}`)
   }
 
-  return normalizeImageGenerationResponse(data as ImageGenerationResponse)
+  return requireGeneratedImages(normalizeImageGenerationResponse(data as ImageGenerationResponse))
 }
 
 export async function editImage(
@@ -219,7 +226,7 @@ export async function editImage(
   if (!response.ok) {
     throw new Error(readErrorMessage(data) || `Image edit failed with status ${response.status}`)
   }
-  return normalizeImageGenerationResponse(data as ImageGenerationResponse)
+  return requireGeneratedImages(normalizeImageGenerationResponse(data as ImageGenerationResponse))
 }
 
 export async function listImageProjects(params: Record<string, unknown> = {}): Promise<ImageWorkspaceListResponse> {

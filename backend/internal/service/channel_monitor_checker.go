@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
 // monitorHTTPClient 共享一个 http.Client，避免每次检测重建 transport。
@@ -51,6 +52,8 @@ type CheckOptions struct {
 	BodyOverride map[string]any
 }
 
+const monitorOpenAIImagePrompt = "Generate a simple health-check image: a small blue circle centered on a white background. No text."
+
 // runCheckForModel 对单个 (provider, model) 做一次完整检测。
 // 不返回 error：所有失败都包装进 CheckResult.Status=error/failed。
 //
@@ -83,6 +86,19 @@ func runCheckForModel(ctx context.Context, provider, endpoint, apiKey, model str
 		bodySnippet := truncateForErrorBody(rawBody)
 		res.Message = truncateMessage(sanitizeErrorMessage(fmt.Sprintf("upstream HTTP %d: %s", statusCode, bodySnippet)))
 		return res
+	}
+
+	if isOpenAIResponsesImageCheck(provider, effectiveCheckAPIMode(provider, model, opts), model) {
+		imageCount := countOpenAIResponseImageOutputsFromJSONBytes([]byte(rawBody))
+		if imageCount == 0 {
+			imageCount = countOpenAIImageOutputsFromSSEBody(rawBody)
+		}
+		if imageCount == 0 {
+			res.Status = MonitorStatusFailed
+			res.Message = truncateMessage("image check returned 2xx without image output")
+			return res
+		}
+		return finalizeOperationalOrDegraded(res, latency, latencyMs)
 	}
 
 	// Replace 模式：跳过 challenge 校验（用户 body 是静态的，challenge 没法嵌入）。
@@ -224,6 +240,9 @@ var providerOpenAIChatAdapter = providerAdapter{
 var providerOpenAIResponsesAdapter = providerAdapter{
 	buildPath: func(string) string { return providerOpenAIResponsesPath },
 	buildBody: func(model, prompt string) ([]byte, error) {
+		if isOpenAIImageGenerationModel(model) {
+			return buildOpenAIResponsesImageMonitorBody(model), nil
+		}
 		return json.Marshal(map[string]any{
 			"model":             model,
 			"instructions":      "You are a channel health-check endpoint. Answer the arithmetic challenge exactly and briefly.",
@@ -236,6 +255,24 @@ var providerOpenAIResponsesAdapter = providerAdapter{
 		return map[string]string{"Authorization": "Bearer " + apiKey}
 	},
 	textPath: "output.0.content.0.text",
+}
+
+func buildOpenAIResponsesImageMonitorBody(model string) []byte {
+	imageModel := strings.TrimSpace(model)
+	if imageModel == "" {
+		imageModel = "gpt-image-2"
+	}
+	body := []byte(`{"model":"","instructions":"Use the image_generation tool to create the requested health-check image.","input":"","stream":false,"store":false,"tool_choice":{"type":"image_generation"},"tools":[{"type":"image_generation","model":"","size":"1024x1024"}]}`)
+	body, _ = sjson.SetBytes(body, "model", openAIImagesResponsesMainModel)
+	body, _ = sjson.SetBytes(body, "input", monitorOpenAIImagePrompt)
+	body, _ = sjson.SetBytes(body, "tools.0.model", imageModel)
+	return body
+}
+
+func isOpenAIResponsesImageCheck(provider, apiMode, model string) bool {
+	return provider == MonitorProviderOpenAI &&
+		defaultAPIMode(apiMode) == MonitorAPIModeResponses &&
+		isOpenAIImageGenerationModel(model)
 }
 
 // providerAdapterFor 按 provider + api_mode 选择具体 adapter。
@@ -263,7 +300,7 @@ func isSupportedProvider(p string) bool {
 //   - status: HTTP 状态码
 //   - err: 网络 / 序列化错误
 func callProvider(ctx context.Context, provider, endpoint, apiKey, model, prompt string, opts *CheckOptions) (extractedText, rawBody string, status int, err error) {
-	requestedAPIMode := checkAPIMode(opts)
+	requestedAPIMode := effectiveCheckAPIMode(provider, model, opts)
 	if err := validateAPIMode(provider, requestedAPIMode); err != nil {
 		return "", "", 0, err
 	}
@@ -416,6 +453,14 @@ func checkAPIMode(opts *CheckOptions) string {
 		return MonitorAPIModeChatCompletions
 	}
 	return defaultAPIMode(opts.APIMode)
+}
+
+func effectiveCheckAPIMode(provider, model string, opts *CheckOptions) string {
+	mode := checkAPIMode(opts)
+	if provider == MonitorProviderOpenAI && isOpenAIImageGenerationModel(model) {
+		return MonitorAPIModeResponses
+	}
+	return mode
 }
 
 func bodyMergeDenyKey(provider, apiMode string) string {

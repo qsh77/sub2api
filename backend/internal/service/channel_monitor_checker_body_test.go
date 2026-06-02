@@ -65,6 +65,7 @@ type openAICaptureHandler struct {
 	lastPath                  string
 	status                    int
 	responsesLeadingReasoning bool
+	responsesImageOutput      bool
 }
 
 func (h *openAICaptureHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -83,6 +84,21 @@ func (h *openAICaptureHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	answer := answerFromOpenAIRequest(parsed)
 	if h.lastPath == providerOpenAIResponsesPath {
+		if h.responsesImageOutput {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"output": []map[string]any{
+					{
+						"type":           "image_generation_call",
+						"status":         "completed",
+						"result":         "aGVsbG8=",
+						"output_format":  "png",
+						"size":           "1024x1024",
+						"revised_prompt": "health check image",
+					},
+				},
+			})
+			return
+		}
 		output := []map[string]any{}
 		if h.responsesLeadingReasoning {
 			output = append(output, map[string]any{
@@ -239,6 +255,40 @@ func TestRunCheckForModel_OpenAIResponses_SkipsLeadingReasoningItem(t *testing.T
 	}
 	if h.lastPath != providerOpenAIResponsesPath {
 		t.Fatalf("expected responses path %q, got %q", providerOpenAIResponsesPath, h.lastPath)
+	}
+}
+
+func TestRunCheckForModel_OpenAIResponsesImageModelUsesImageTool(t *testing.T) {
+	h := &openAICaptureHandler{responsesImageOutput: true}
+	endpoint := setupFakeOpenAI(t, h)
+
+	res := runCheckForModel(context.Background(), MonitorProviderOpenAI, endpoint, "sk-openai", "gpt-image-2", nil)
+
+	if res.Status != MonitorStatusOperational {
+		t.Fatalf("responses image request should pass when an image is returned, got status=%s message=%q", res.Status, res.Message)
+	}
+	if h.lastPath != providerOpenAIResponsesPath {
+		t.Fatalf("expected responses path %q, got %q", providerOpenAIResponsesPath, h.lastPath)
+	}
+	if h.lastBody["model"] != openAIImagesResponsesMainModel {
+		t.Errorf("image monitor body should use responses-capable model %q, got %v", openAIImagesResponsesMainModel, h.lastBody["model"])
+	}
+	tools, ok := h.lastBody["tools"].([]any)
+	if !ok || len(tools) != 1 {
+		t.Fatalf("expected one image_generation tool, got %#v", h.lastBody["tools"])
+	}
+	tool, ok := tools[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected image_generation tool object, got %#v", tools[0])
+	}
+	if tool["type"] != "image_generation" {
+		t.Errorf("expected image_generation tool type, got %v", tool["type"])
+	}
+	if tool["model"] != "gpt-image-2" {
+		t.Errorf("expected image tool model gpt-image-2, got %v", tool["model"])
+	}
+	if choice, ok := h.lastBody["tool_choice"].(map[string]any); !ok || choice["type"] != "image_generation" {
+		t.Errorf("expected image_generation tool_choice, got %#v", h.lastBody["tool_choice"])
 	}
 }
 
