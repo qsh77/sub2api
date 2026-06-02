@@ -3,95 +3,94 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AiChatWorkspace from '../AiChatWorkspace.vue'
 
 const sendChatCompletionMock = vi.hoisted(() => vi.fn())
+const apiMocks = vi.hoisted(() => {
+  const group = {
+    id: 7,
+    name: 'OpenAI pool',
+    description: null,
+    platform: 'openai',
+    rate_multiplier: 1,
+    is_exclusive: false,
+    status: 'active',
+    subscription_type: 'standard',
+    daily_limit_usd: null,
+    weekly_limit_usd: null,
+    monthly_limit_usd: null,
+    allow_image_generation: false,
+    image_rate_independent: false,
+    image_rate_multiplier: 1,
+    image_price_1k: null,
+    image_price_2k: null,
+    image_price_4k: null,
+    claude_code_only: false,
+    fallback_group_id: null,
+    fallback_group_id_on_invalid_request: null,
+    require_oauth_only: false,
+    require_privacy_set: false,
+    created_at: '',
+    updated_at: '',
+  }
+  const key = {
+    id: 1,
+    user_id: 1,
+    key: 'sk-test',
+    name: 'Default key',
+    group_id: 7,
+    status: 'active',
+    ip_whitelist: [],
+    ip_blacklist: [],
+    last_used_at: null,
+    quota: 0,
+    quota_used: 0,
+    expires_at: null,
+    created_at: '',
+    updated_at: '',
+    group,
+    rate_limit_5h: 0,
+    rate_limit_1d: 0,
+    rate_limit_7d: 0,
+    usage_5h: 0,
+    usage_1d: 0,
+    usage_7d: 0,
+    window_5h_start: null,
+    window_1d_start: null,
+    window_7d_start: null,
+    reset_5h_at: null,
+    reset_1d_at: null,
+    reset_7d_at: null,
+  }
+  const page = (items: unknown[]) => ({
+    items,
+    total: items.length,
+    page: 1,
+    page_size: 100,
+    pages: 1,
+  })
+  return {
+    group,
+    key,
+    page,
+    keysList: vi.fn(),
+    getAvailable: vi.fn(),
+    adminGetAll: vi.fn(),
+    adminGetGroupApiKeys: vi.fn(),
+  }
+})
 
 vi.mock('@/api', () => ({
   keysAPI: {
-    list: vi.fn(async () => ({
-      items: [{
-        id: 1,
-        user_id: 1,
-        key: 'sk-test',
-        name: 'Default key',
-        group_id: 7,
-        status: 'active',
-        ip_whitelist: [],
-        ip_blacklist: [],
-        last_used_at: null,
-        quota: 0,
-        quota_used: 0,
-        expires_at: null,
-        created_at: '',
-        updated_at: '',
-        group: {
-          id: 7,
-          name: 'OpenAI pool',
-          description: null,
-          platform: 'openai',
-          rate_multiplier: 1,
-          is_exclusive: false,
-          status: 'active',
-          subscription_type: 'standard',
-          daily_limit_usd: null,
-          weekly_limit_usd: null,
-          monthly_limit_usd: null,
-          allow_image_generation: false,
-          image_rate_independent: false,
-          image_rate_multiplier: 1,
-          image_price_1k: null,
-          image_price_2k: null,
-          image_price_4k: null,
-          claude_code_only: false,
-          fallback_group_id: null,
-          fallback_group_id_on_invalid_request: null,
-          require_oauth_only: false,
-          require_privacy_set: false,
-          created_at: '',
-          updated_at: '',
-        },
-        rate_limit_5h: 0,
-        rate_limit_1d: 0,
-        rate_limit_7d: 0,
-        usage_5h: 0,
-        usage_1d: 0,
-        usage_7d: 0,
-        window_5h_start: null,
-        window_1d_start: null,
-        window_7d_start: null,
-        reset_5h_at: null,
-        reset_1d_at: null,
-        reset_7d_at: null,
-      }],
-      total: 1,
-      page: 1,
-      page_size: 100,
-      pages: 1,
-    })),
+    list: apiMocks.keysList,
   },
   userChannelsAPI: {
-    getAvailable: vi.fn(async () => ([{
-      name: 'OpenAI',
-      description: '',
-      platforms: [{
-        platform: 'openai',
-        groups: [{
-          id: 7,
-          name: 'OpenAI pool',
-          platform: 'openai',
-          subscription_type: 'standard',
-          rate_multiplier: 1,
-          is_exclusive: false,
-        }],
-        supported_models: [{ name: 'gpt-5.4', platform: 'openai', pricing: null }],
-      }],
-    }])),
+    getAvailable: apiMocks.getAvailable,
   },
 }))
 
 vi.mock('@/api/admin', () => ({
   adminAPI: {
     groups: {
-      getAll: vi.fn(),
-      getGroupApiKeys: vi.fn(),
+      getAll: apiMocks.adminGetAll,
+      getGroupApiKeys: apiMocks.adminGetGroupApiKeys,
     },
   },
 }))
@@ -106,6 +105,35 @@ describe('AiChatWorkspace', () => {
   beforeEach(() => {
     localStorage.clear()
     vi.useRealTimers()
+    apiMocks.keysList.mockReset()
+    apiMocks.keysList.mockResolvedValue(apiMocks.page([{ ...apiMocks.key }]))
+    apiMocks.getAvailable.mockReset()
+    apiMocks.getAvailable.mockResolvedValue([{
+      name: 'OpenAI',
+      description: '',
+      platforms: [{
+        platform: 'openai',
+        groups: [{
+          id: 7,
+          name: 'OpenAI pool',
+          platform: 'openai',
+          subscription_type: 'standard',
+          rate_multiplier: 1,
+          is_exclusive: false,
+        }],
+        supported_models: [{ name: 'gpt-5.4', platform: 'openai', pricing: null }],
+      }],
+    }])
+    apiMocks.adminGetAll.mockReset()
+    apiMocks.adminGetAll.mockResolvedValue([{ ...apiMocks.group }])
+    apiMocks.adminGetGroupApiKeys.mockReset()
+    apiMocks.adminGetGroupApiKeys.mockResolvedValue(apiMocks.page([{
+      ...apiMocks.key,
+      id: 99,
+      user_id: 99,
+      key: 'sk-other-secret',
+      name: 'Other user key',
+    }]))
     sendChatCompletionMock.mockReset()
     sendChatCompletionMock.mockImplementation(async (_key, _payload, options) => {
       options.onDelta('你好')
@@ -158,6 +186,47 @@ describe('AiChatWorkspace', () => {
       expect.objectContaining({ onDelta: expect.any(Function) })
     )
     expect(wrapper.text()).toContain('你好')
+  })
+
+  it('does not load other users keys in admin chat', async () => {
+    apiMocks.keysList.mockResolvedValueOnce(apiMocks.page([{
+      ...apiMocks.key,
+      id: 8,
+      key: 'sk-admin-owned',
+      name: 'Admin owned key',
+    }]))
+
+    const wrapper = mount(AiChatWorkspace, {
+      props: { scope: 'admin' },
+      global: {
+        stubs: {
+          AppLayout: { template: '<main><slot /></main>' },
+          Icon: { template: '<span />' },
+          Select: {
+            props: ['modelValue', 'options'],
+            emits: ['update:modelValue'],
+            template: `
+              <select :value="modelValue" @change="$emit('update:modelValue', $event.target.value)">
+                <option v-for="option in options" :key="String(option.value)" :value="option.value">{{ option.label }}</option>
+              </select>
+            `,
+          },
+        },
+      },
+    })
+
+    await flushPromises()
+
+    expect(apiMocks.adminGetGroupApiKeys).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Admin owned key')
+    expect(wrapper.text()).not.toContain('Other user key')
+    expect(wrapper.text()).not.toContain('sk-other-secret')
+
+    await wrapper.get('textarea').setValue('管理员测试')
+    await wrapper.get('button[title="发送"]').trigger('click')
+    await flushPromises()
+
+    expect(sendChatCompletionMock.mock.calls[0][0]).toBe('sk-admin-owned')
   })
 
   it('shows reasoning and web search state during streaming', async () => {

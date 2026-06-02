@@ -291,14 +291,14 @@ let traceTimer: ReturnType<typeof setInterval> | null = null
 const availableGroups = computed<ChatGroup[]>(() => isAdmin.value ? adminGroups.value : userGroups.value)
 const selectedGroup = computed<ChatGroup | null>(() => availableGroups.value.find((group) => group.id === Number(selectedGroupId.value)) || null)
 const keyOptions = computed<SelectOption[]>(() => filteredKeys.value.map((key) => ({
-  value: key.key,
-  label: key.name || maskKey(key.key),
+  value: key.id,
+  label: apiKeyOptionLabel(key),
 })))
 const groupOptions = computed<SelectOption[]>(() => availableGroups.value.map((group) => ({
   value: group.id,
   label: `${group.name} · ${platformLabel(group.platform)}`,
 })))
-const selectedKey = computed(() => filteredKeys.value.find((key) => key.key === selectedKeyValue.value) || null)
+const selectedKey = computed(() => filteredKeys.value.find((key) => key.id === Number(selectedKeyValue.value)) || null)
 const filteredKeys = computed(() => {
   const groupId = Number(selectedGroupId.value)
   if (!groupId) return []
@@ -336,14 +336,13 @@ watch(availableGroups, (groups) => {
   }
 }, { immediate: true })
 
-watch(selectedGroupId, async (groupId) => {
+watch(selectedGroupId, () => {
   selectedKeyValue.value = null
-  if (isAdmin.value) await loadAdminKeys(Number(groupId))
 }, { immediate: true })
 
 watch(filteredKeys, (items) => {
-  if (!items.some((key) => key.key === selectedKeyValue.value)) {
-    selectedKeyValue.value = items[0]?.key || null
+  if (!items.some((key) => key.id === Number(selectedKeyValue.value))) {
+    selectedKeyValue.value = items[0]?.id || null
   }
 }, { immediate: true })
 
@@ -383,7 +382,12 @@ async function loadData() {
   loading.value = true
   try {
     if (isAdmin.value) {
-      adminGroups.value = (await adminAPI.groups.getAll()).filter((group) => group.status === 'active')
+      const [groups, keys] = await Promise.all([
+        adminAPI.groups.getAll(),
+        keysAPI.list(1, 100, { status: 'active' }),
+      ])
+      adminGroups.value = groups.filter((group) => group.status === 'active')
+      activeKeys.value = keys.items.filter((key) => key.status === 'active' && !!key.group_id)
     } else {
       const [keys, channelList] = await Promise.all([
         keysAPI.list(1, 100, { status: 'active' }),
@@ -401,13 +405,6 @@ async function loadData() {
   }
 }
 
-async function loadAdminKeys(groupId: number) {
-  activeKeys.value = []
-  if (!groupId) return
-  const result = await adminAPI.groups.getGroupApiKeys(groupId, 1, 100)
-  activeKeys.value = ((result.items || []) as ApiKey[]).filter((key) => key.status === 'active')
-}
-
 async function send() {
   if (!canSend.value || !selectedKey.value) return
   const text = trimmedPrompt.value
@@ -418,12 +415,12 @@ async function send() {
   assistantMessage.searchEnabled = webSearchEnabled.value
   assistantMessage.modelName = String(model.value)
   assistantMessage.groupName = selectedGroup.value?.name || ''
-  assistantMessage.keyName = selectedKey.value.name || maskKey(selectedKey.value.key)
+  assistantMessage.keyName = apiKeyOptionLabel(selectedKey.value)
   assistantMessage.startedAt = Date.now()
   assistantMessage.traceEvents = [{ label: '发送请求', at: assistantMessage.startedAt }]
   conversation.messages.push(userMessage, assistantMessage)
   conversation.groupId = Number(selectedGroupId.value) || null
-  conversation.keyName = selectedKey.value.name || ''
+  conversation.keyName = apiKeyOptionLabel(selectedKey.value)
   conversation.model = String(model.value)
   touchConversation(conversation)
   prompt.value = ''
@@ -721,9 +718,8 @@ function platformLabel(platform: string) {
   return platform
 }
 
-function maskKey(value: string) {
-  if (value.length <= 10) return value
-  return `${value.slice(0, 6)}...${value.slice(-4)}`
+function apiKeyOptionLabel(key: ApiKey) {
+  return key.name || `API Key #${key.id}`
 }
 
 function readErrorText(err: unknown) {
