@@ -361,7 +361,7 @@ export default {
     groups: '分组管理',
     channels: '渠道管理',
     availableChannels: '可用渠道',
-    aiChat: 'AI 聊天',
+    aiChat: 'AI 对话',
     imageGeneration: '图片生成',
     subscriptions: '订阅管理',
     accounts: '账号管理',
@@ -1069,11 +1069,11 @@ export default {
   },
 
   aiChat: {
-    title: 'AI 聊天',
-    description: '选择分组、密钥和模型进行对话',
+    title: 'AI 对话',
+    description: '在一个创作台里对话和作画',
     admin: {
-      title: 'AI 聊天',
-      description: '选择分组、密钥和模型进行对话'
+      title: 'AI 对话',
+      description: '在一个创作台里对话和作画'
     }
   },
 

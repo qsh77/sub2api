@@ -160,6 +160,38 @@ describe('AiChatWorkspace', () => {
     expect(wrapper.text()).toContain('你好')
   })
 
+  it('renders the unified creation mode switch without video or credits', async () => {
+    const wrapper = mount(AiChatWorkspace, {
+      props: { scope: 'user', activeMode: 'dialogue' },
+      global: {
+        stubs: {
+          AppLayout: { template: '<main><slot /></main>' },
+          Icon: { template: '<span />' },
+          Select: {
+            props: ['modelValue', 'options'],
+            emits: ['update:modelValue'],
+            template: `
+              <select :value="modelValue" @change="$emit('update:modelValue', $event.target.value)">
+                <option v-for="option in options" :key="String(option.value)" :value="option.value">{{ option.label }}</option>
+              </select>
+            `,
+          },
+        },
+      },
+    })
+
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="ai-mode-tabs"]').text()).toContain('对话')
+    expect(wrapper.get('[data-testid="ai-mode-tabs"]').text()).toContain('作画')
+    expect(wrapper.text()).not.toContain('视频')
+    expect(wrapper.text()).not.toContain('积分')
+
+    await wrapper.get('[data-testid="ai-mode-image"]').trigger('click')
+
+    expect(wrapper.emitted('mode-change')?.[0]).toEqual(['image'])
+  })
+
   it('shows reasoning and web search state during streaming', async () => {
     sendChatCompletionMock.mockImplementation(async (_key, _payload, options) => {
       options.onThoughtDelta('先看最新信息')

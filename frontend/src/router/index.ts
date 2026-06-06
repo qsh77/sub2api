@@ -211,7 +211,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'AI Chat',
+      title: 'AI Conversation',
       titleKey: 'aiChat.title',
       descriptionKey: 'aiChat.description'
     }
@@ -267,13 +267,13 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/images',
     name: 'ImageGeneration',
-    component: () => import('@/views/user/ImageGenerationView.vue'),
+    component: () => import('@/views/user/AiChatView.vue'),
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'Image Generation',
-      titleKey: 'imageGeneration.title',
-      descriptionKey: 'imageGeneration.description'
+      title: 'AI Conversation',
+      titleKey: 'aiChat.title',
+      descriptionKey: 'aiChat.description'
     }
   },
   {
@@ -519,7 +519,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
-      title: 'AI Chat',
+      title: 'AI Conversation',
       titleKey: 'aiChat.admin.title',
       descriptionKey: 'aiChat.admin.description'
     }
@@ -527,13 +527,13 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/admin/images',
     name: 'AdminImageGeneration',
-    component: () => import('@/views/admin/ImageGenerationView.vue'),
+    component: () => import('@/views/admin/AiChatView.vue'),
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
-      title: 'Image Generation',
-      titleKey: 'imageGeneration.admin.title',
-      descriptionKey: 'imageGeneration.admin.description'
+      title: 'AI Conversation',
+      titleKey: 'aiChat.admin.title',
+      descriptionKey: 'aiChat.admin.description'
     }
   },
   {

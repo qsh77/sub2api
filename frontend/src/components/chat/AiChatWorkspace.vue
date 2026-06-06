@@ -63,30 +63,6 @@
               />
             </label>
           </div>
-          <div class="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              class="ai-chat-toggle"
-              :class="thinkingEnabled ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900' : 'border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-dark-700 dark:text-dark-300 dark:hover:bg-dark-800'"
-              :disabled="generating"
-              title="深度思考"
-              @click="thinkingEnabled = !thinkingEnabled"
-            >
-              <Icon name="brain" size="sm" />
-              <span>深度思考</span>
-            </button>
-            <button
-              type="button"
-              class="ai-chat-toggle"
-              :class="webSearchEnabled ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900' : 'border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-dark-700 dark:text-dark-300 dark:hover:bg-dark-800'"
-              :disabled="generating"
-              title="联网搜索"
-              @click="webSearchEnabled = !webSearchEnabled"
-            >
-              <Icon name="globe" size="sm" />
-              <span>联网搜索</span>
-            </button>
-          </div>
         </header>
 
         <main ref="messagesEl" class="flex-1 overflow-y-auto px-4 py-6">
@@ -174,35 +150,62 @@
         <footer class="border-t border-gray-100 bg-white/95 px-4 py-3 backdrop-blur dark:border-dark-800 dark:bg-dark-950/95">
           <div class="mx-auto max-w-3xl">
             <p v-if="unavailableMessage" class="mb-2 text-sm text-red-600 dark:text-red-400">{{ unavailableMessage }}</p>
-            <div class="flex items-end gap-2 rounded-3xl border border-gray-200 bg-white p-2 shadow-lg dark:border-dark-700 dark:bg-dark-900">
+            <div class="ai-creation-composer">
               <textarea
                 ref="promptEl"
                 v-model="prompt"
                 rows="1"
-                class="max-h-40 min-h-10 flex-1 resize-none border-0 bg-transparent px-2 py-2 text-base text-gray-900 outline-none placeholder:text-gray-400 dark:text-white"
+                class="max-h-40 min-h-20 w-full resize-none border-0 bg-transparent px-3 py-3 text-base text-gray-900 outline-none placeholder:text-gray-400 dark:text-white"
                 placeholder="输入消息"
                 :disabled="generating"
                 @keydown.enter.exact.prevent="send"
               />
-              <button
-                v-if="generating"
-                type="button"
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-gray-700 dark:bg-dark-700 dark:text-dark-100"
-                title="停止"
-                @click="stop"
-              >
-                <Icon name="x" size="sm" />
-              </button>
-              <button
-                v-else
-                type="button"
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-900 text-white disabled:cursor-not-allowed disabled:bg-gray-300 dark:bg-white dark:text-gray-900 dark:disabled:bg-dark-700"
-                :disabled="!canSend"
-                title="发送"
-                @click="send"
-              >
-                <Icon name="arrowUp" size="sm" />
-              </button>
+              <div class="ai-creation-actions">
+                <AiModeTabs :model-value="activeMode" @update:model-value="emit('mode-change', $event)" />
+                <div class="flex flex-wrap items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    class="ai-chat-toggle"
+                    :class="thinkingEnabled ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900' : 'border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-dark-700 dark:text-dark-300 dark:hover:bg-dark-800'"
+                    :disabled="generating"
+                    title="深度思考"
+                    @click="thinkingEnabled = !thinkingEnabled"
+                  >
+                    <Icon name="brain" size="sm" />
+                    <span>深度思考</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="ai-chat-toggle"
+                    :class="webSearchEnabled ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900' : 'border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-dark-700 dark:text-dark-300 dark:hover:bg-dark-800'"
+                    :disabled="generating"
+                    title="联网搜索"
+                    @click="webSearchEnabled = !webSearchEnabled"
+                  >
+                    <Icon name="globe" size="sm" />
+                    <span>联网搜索</span>
+                  </button>
+                  <button
+                    v-if="generating"
+                    type="button"
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-gray-700 dark:bg-dark-700 dark:text-dark-100"
+                    title="停止"
+                    @click="stop"
+                  >
+                    <Icon name="x" size="sm" />
+                  </button>
+                  <button
+                    v-else
+                    type="button"
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-900 text-white disabled:cursor-not-allowed disabled:bg-gray-300 dark:bg-white dark:text-gray-900 dark:disabled:bg-dark-700"
+                    :disabled="!canSend"
+                    title="发送"
+                    @click="send"
+                  >
+                    <Icon name="arrowUp" size="sm" />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </footer>
@@ -216,6 +219,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
+import AiModeTabs, { type AiCreationMode } from '@/components/ai/AiModeTabs.vue'
 import { adminAPI } from '@/api/admin'
 import { keysAPI, userChannelsAPI } from '@/api'
 import { extractChatModelsForGroup, fallbackChatModels, sendChatCompletion, type AiChatMessage, type AiChatRole, type AiChatCompletionRequest, type AiChatToolCall } from '@/api/aiChat'
@@ -261,7 +265,10 @@ interface ChatConversation {
   updatedAt: number
 }
 
-const props = defineProps<{ scope: WorkspaceScope }>()
+const props = withDefaults(defineProps<{ scope: WorkspaceScope; activeMode?: AiCreationMode }>(), {
+  activeMode: 'dialogue',
+})
+const emit = defineEmits<{ 'mode-change': [value: AiCreationMode] }>()
 
 const storageKey = `sub2api:ai-chat:${props.scope}:v1`
 const settingsStorageKey = `sub2api:ai-chat:${props.scope}:settings:v1`
@@ -751,5 +758,13 @@ function readErrorText(err: unknown) {
 
 .ai-chat-control :deep(.select-trigger) {
   @apply h-9 rounded-lg px-3 py-1.5 text-sm;
+}
+
+.ai-creation-composer {
+  @apply rounded-[1.75rem] border border-gray-200 bg-white p-2 shadow-xl shadow-gray-200/70 dark:border-dark-700 dark:bg-dark-900 dark:shadow-black/20;
+}
+
+.ai-creation-actions {
+  @apply flex flex-col gap-2 border-t border-gray-100 px-1 pt-2 dark:border-dark-800 sm:flex-row sm:items-center sm:justify-between;
 }
 </style>
