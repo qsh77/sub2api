@@ -30,3 +30,12 @@ describe('AppSidebar header styles', () => {
     expect(sidebarBrandBlockMatch?.[0]).not.toContain('overflow: hidden;')
   })
 })
+
+describe('AppSidebar AI workspace navigation', () => {
+  it('keeps AI conversation as the single AI creation entry', () => {
+    expect(componentSource).toContain("label: t('nav.aiChat')")
+    expect(componentSource).not.toContain("{ path: '/images'")
+    expect(componentSource).not.toContain("{ path: '/admin/images'")
+    expect(componentSource).not.toContain("label: t('nav.imageGeneration')")
+  })
+})

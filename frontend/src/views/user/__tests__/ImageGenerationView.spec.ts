@@ -312,6 +312,46 @@ describe('ImageGenerationView', () => {
     expect(showSuccess).toHaveBeenCalledWith('图片已保存')
   })
 
+  it('waits for authenticated saved image blobs instead of rendering protected file URLs', async () => {
+    const imageBlob = deferred<Blob>()
+    fetchImageVersionBlob.mockReturnValue(imageBlob.promise)
+    const wrapper = await mountView([apiKey()], {
+      projects: {
+        items: [{ id: 7, user_id: 1, title: 'Saved', cover_version_id: 7, status: 'active', created_at: '', updated_at: '', version_count: 1 }],
+        total: 1,
+        page: 1,
+        page_size: 50,
+        pages: 1,
+      },
+      detail: {
+        project: { id: 7, user_id: 1, title: 'Saved', cover_version_id: 7, status: 'active', created_at: '', updated_at: '' },
+        versions: [{
+          id: 7,
+          project_id: 7,
+          user_id: 1,
+          mode: 'generation',
+          prompt: 'saved image',
+          model: 'gpt-image-2',
+          size: '1024x1024',
+          mime_type: 'image/png',
+          file_size_bytes: 5,
+          sha256: '',
+          width: 1,
+          height: 1,
+          created_at: '',
+        }],
+      },
+    })
+
+    expect(wrapper.find('img[alt="generated-image-7"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('图片加载中')
+
+    imageBlob.resolve(new Blob(['saved'], { type: 'image/png' }))
+    await flushPromises()
+
+    expect(wrapper.find('img[alt="generated-image-7"]').attributes('src')).toBe('blob:mock-1')
+  })
+
   it('moves prompt into chat immediately and clears the composer while generating', async () => {
     const generation = deferred<unknown>()
     generateImage.mockReturnValue(generation.promise)

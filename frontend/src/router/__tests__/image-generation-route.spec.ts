@@ -44,7 +44,7 @@ vi.mock('@/composables/useRoutePrefetch', () => ({
 }))
 
 describe('image generation routes', () => {
-  it('registers the user image generation route', async () => {
+  it('keeps the user image entry on the unified AI conversation workspace', async () => {
     const { default: router } = await import('@/router')
     const routes = router.getRoutes()
     const route = routes.find((record) => record.path === '/images')
@@ -52,13 +52,11 @@ describe('image generation routes', () => {
 
     expect(route?.name).toBe('ImageGeneration')
     expect(routeByName?.path).toBe('/images')
-    expect(route?.meta.requiresAuth).toBe(true)
-    expect(route?.meta.requiresAdmin).toBe(false)
-    expect(route?.meta.titleKey).toBe('imageGeneration.title')
-    expect(route?.meta.descriptionKey).toBe('imageGeneration.description')
+    expect(route?.meta.title).toBe('AI Conversation')
+    expect(route?.meta.titleKey).toBe('aiChat.title')
   })
 
-  it('registers the admin image generation route', async () => {
+  it('keeps the admin image entry on the unified AI conversation workspace', async () => {
     const { default: router } = await import('@/router')
     const routes = router.getRoutes()
     const route = routes.find((record) => record.path === '/admin/images')
@@ -66,9 +64,7 @@ describe('image generation routes', () => {
 
     expect(route?.name).toBe('AdminImageGeneration')
     expect(routeByName?.path).toBe('/admin/images')
-    expect(route?.meta.requiresAuth).toBe(true)
-    expect(route?.meta.requiresAdmin).toBe(true)
-    expect(route?.meta.titleKey).toBe('imageGeneration.admin.title')
-    expect(route?.meta.descriptionKey).toBe('imageGeneration.admin.description')
+    expect(route?.meta.title).toBe('AI Conversation')
+    expect(route?.meta.titleKey).toBe('aiChat.admin.title')
   })
 })

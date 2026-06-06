@@ -1,9 +1,27 @@
 <template>
   <AppLayout main-class="p-0">
-    <div class="flex min-h-[calc(100vh-4rem)] flex-col bg-white dark:bg-dark-950">
-      <div class="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pt-5 sm:px-6 lg:px-8">
-        <header class="sticky top-16 z-20 -mx-4 border-b border-gray-100 bg-white/95 px-4 py-4 backdrop-blur dark:border-dark-800 dark:bg-dark-950/95 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-          <div class="grid items-end gap-2 md:grid-cols-2 xl:grid-cols-[minmax(120px,0.8fr)_minmax(140px,0.9fr)_minmax(150px,0.9fr)_88px_auto]">
+    <div class="flex h-[calc(100vh-4rem)] min-h-[560px] bg-slate-50 text-gray-900 dark:bg-dark-950 dark:text-white">
+      <aside class="hidden w-72 shrink-0 border-r border-gray-100 bg-white/80 p-3 dark:border-dark-800 dark:bg-dark-900/70 lg:flex lg:flex-col">
+        <button type="button" class="btn btn-primary h-10 w-full justify-center" :disabled="loading" @click="startNewProject">
+          新对话
+        </button>
+        <div class="mt-4 flex-1 space-y-2 overflow-y-auto">
+          <button
+            v-for="project in projects"
+            :key="project.id"
+            type="button"
+            class="w-full rounded-2xl border bg-white px-3 py-3 text-left text-sm shadow-sm transition dark:bg-dark-800"
+            :class="project.id === selectedProjectId ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white' : 'border-gray-100 text-gray-600 hover:border-gray-200 dark:border-dark-700 dark:text-dark-300 dark:hover:border-dark-600'"
+            @click="selectProject(project.id)"
+          >
+            <span class="block truncate font-medium">{{ project.title || '未命名图片' }}</span>
+          </button>
+        </div>
+      </aside>
+
+      <section class="flex min-w-0 flex-1 flex-col">
+        <header class="border-b border-gray-100 bg-white/95 px-4 py-4 backdrop-blur dark:border-dark-800 dark:bg-dark-950/95">
+          <div class="grid items-end gap-2 md:grid-cols-2 xl:grid-cols-[minmax(120px,0.8fr)_minmax(140px,0.9fr)_minmax(150px,0.9fr)_88px]">
             <label v-if="isAdmin" class="image-control-field">
               <span class="image-control-label">分组</span>
               <Select
@@ -32,29 +50,10 @@
               <span class="image-control-label">尺寸</span>
               <Select v-model="size" class="image-control-select" :options="sizeOptions" :disabled="generating" />
             </label>
-            <div class="image-control-field">
-              <span class="image-control-label">会话</span>
-              <button type="button" class="btn btn-secondary h-9 px-3 text-sm lg:justify-self-end" :disabled="loading" @click="startNewProject">
-                新对话
-              </button>
-            </div>
-          </div>
-
-          <div class="mt-2 flex flex-wrap items-center gap-1.5">
-            <button
-              v-for="project in projects"
-              :key="project.id"
-              type="button"
-              class="rounded-full border px-2.5 py-0.5 text-xs transition"
-              :class="project.id === selectedProjectId ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900' : 'border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-dark-700 dark:text-dark-300 dark:hover:bg-dark-800'"
-              @click="selectProject(project.id)"
-            >
-              {{ project.title || '未命名图片' }}
-            </button>
           </div>
         </header>
 
-        <main ref="chatEl" class="flex-1 space-y-8 py-8 pb-36">
+        <main ref="chatEl" class="flex-1 space-y-8 overflow-y-auto px-4 py-8 pb-36 sm:px-6 lg:px-8">
           <div v-if="chatItems.length === 0 && visiblePendingMessages.length === 0 && !uploadPreviewUrl && !generating" class="flex min-h-[45vh] items-center justify-center text-center">
             <div class="max-w-md">
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">想生成什么图片？</h2>
@@ -87,14 +86,18 @@
                 :class="item.version.id === selectedVersionId ? 'ring-2 ring-gray-900 dark:ring-white' : ''"
               >
                 <img
+                  v-if="versionSrc(item.version)"
                   :src="versionSrc(item.version)"
                   :alt="`generated-image-${item.version.id}`"
                   class="max-h-[460px] w-full max-w-[560px] cursor-pointer object-contain"
                   @click="selectVersionForEdit(item.version.id)"
                 />
+                <div v-else class="flex h-44 w-72 max-w-full items-center justify-center text-sm text-gray-400 dark:text-dark-400">
+                  {{ versionLoadLabel(item.version) }}
+                </div>
                 <div class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-3 p-3">
                   <div class="flex items-center gap-2">
-                    <a class="flex h-8 w-8 items-center justify-center rounded-full bg-black/35 text-sm text-white/80 backdrop-blur hover:bg-black/45 hover:text-white" title="下载" :href="versionSrc(item.version)" :download="`image-${item.version.id}.png`" @click.stop>
+                    <a v-if="versionSrc(item.version)" class="flex h-8 w-8 items-center justify-center rounded-full bg-black/35 text-sm text-white/80 backdrop-blur hover:bg-black/45 hover:text-white" title="下载" :href="versionSrc(item.version)" :download="`image-${item.version.id}.png`" @click.stop>
                       ⇩
                     </a>
                   </div>
@@ -141,37 +144,43 @@
             </div>
           </template>
         </main>
-      </div>
-
-      <footer class="sticky bottom-0 z-30 border-t border-gray-100 bg-white/95 px-4 py-3 backdrop-blur dark:border-dark-800 dark:bg-dark-950/95">
-        <div class="mx-auto w-full max-w-3xl">
-          <p v-if="unavailableMessage" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ unavailableMessage }}</p>
-          <p v-if="errorText" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ errorText }}</p>
-          <div class="flex items-end gap-2.5 rounded-[1.75rem] border border-gray-200 bg-white p-2 shadow-lg dark:border-dark-700 dark:bg-dark-900">
-            <input ref="fileInputEl" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="onUploadFile" />
-            <button type="button" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl text-gray-800 hover:bg-gray-100 dark:text-dark-100 dark:hover:bg-dark-800" @click="fileInputEl?.click()">
-              +
-            </button>
-            <textarea
-              ref="promptEl"
-              v-model="prompt"
-              rows="1"
-              class="max-h-36 min-h-10 flex-1 resize-none border-0 bg-transparent px-1 py-1.5 text-base text-gray-900 outline-none placeholder:text-gray-400 dark:text-white"
-              :disabled="generating"
-              @keydown.enter.exact.prevent="run"
-            />
-            <button
-              :data-testid="isAdmin ? 'admin-generate-image' : 'generate-image'"
-              type="button"
-              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-900 text-white disabled:cursor-not-allowed disabled:bg-gray-300 dark:bg-white dark:text-gray-900 dark:disabled:bg-dark-700"
-              :disabled="!canRun"
-              @click="run"
-            >
-              ↑
-            </button>
+        <footer class="border-t border-gray-100 bg-white/95 px-4 py-3 backdrop-blur dark:border-dark-800 dark:bg-dark-950/95">
+          <div class="mx-auto w-full max-w-3xl">
+            <p v-if="unavailableMessage" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ unavailableMessage }}</p>
+            <p v-if="errorText" class="mb-3 text-sm text-red-600 dark:text-red-400">{{ errorText }}</p>
+            <div class="ai-creation-composer">
+              <input ref="fileInputEl" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="onUploadFile" />
+              <textarea
+                ref="promptEl"
+                v-model="prompt"
+                rows="1"
+                class="max-h-36 min-h-20 w-full resize-none border-0 bg-transparent px-3 py-3 text-base text-gray-900 outline-none placeholder:text-gray-400 dark:text-white"
+                :placeholder="selectedVersion ? '' : '输入你想生成的画面，也可以上传图片继续编辑'"
+                :disabled="generating"
+                @keydown.enter.exact.prevent="run"
+              />
+              <div class="ai-creation-actions">
+                <AiModeTabs :model-value="activeMode" @update:model-value="emit('mode-change', $event)" />
+                <div class="flex items-center justify-end gap-2">
+                  <button type="button" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-800 hover:bg-gray-100 dark:text-dark-100 dark:hover:bg-dark-800" title="上传图片" @click="fileInputEl?.click()">
+                    <Icon name="upload" size="sm" />
+                  </button>
+                  <button
+                    :data-testid="isAdmin ? 'admin-generate-image' : 'generate-image'"
+                    type="button"
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-900 text-white disabled:cursor-not-allowed disabled:bg-gray-300 dark:bg-white dark:text-gray-900 dark:disabled:bg-dark-700"
+                    :disabled="!canRun"
+                    title="发送"
+                    @click="run"
+                  >
+                    <Icon name="arrowUp" size="sm" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      </section>
     </div>
   </AppLayout>
 </template>
@@ -180,6 +189,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Select from '@/components/common/Select.vue'
+import Icon from '@/components/icons/Icon.vue'
+import AiModeTabs, { type AiCreationMode } from '@/components/ai/AiModeTabs.vue'
 import { keysAPI, userChannelsAPI } from '@/api'
 import { adminAPI } from '@/api/admin'
 import {
@@ -190,7 +201,6 @@ import {
   generateImage,
   getImageProject,
   imageBillingTierForSize,
-  imageVersionFileUrl,
   IMAGE_SIZE_OPTIONS,
   listImageProjects,
   resolveKeyImageState,
@@ -237,7 +247,10 @@ interface SaveContext {
   sourceVersion: ImageWorkspaceVersion | null
 }
 
-const props = defineProps<{ scope: WorkspaceScope }>()
+const props = withDefaults(defineProps<{ scope: WorkspaceScope; activeMode?: AiCreationMode }>(), {
+  activeMode: 'image',
+})
+const emit = defineEmits<{ 'mode-change': [value: AiCreationMode] }>()
 const THOUGHT_STORAGE_KEY = 'sub2api:image-thoughts:v1'
 
 const appStore = useAppStore()
@@ -259,6 +272,7 @@ const uploadFile = ref<File | null>(null)
 const uploadPreviewUrl = ref('')
 const pendingMessages = ref<PendingMessage[]>([])
 const versionObjectUrls = ref<Record<number, string>>({})
+const versionLoadFailures = ref<Record<number, boolean>>({})
 const versionThoughts = ref<Record<number, ThoughtRecord>>(readStoredThoughts())
 const expandedThoughtKey = ref<string | null>(null)
 const errorText = ref('')
@@ -516,12 +530,13 @@ async function saveBlob(blob: Blob, savedMode: 'generation' | 'edit' | 'upload',
     form.append('source_version_id', String(saveContext.sourceVersion.id))
   }
   const detail = await uploadImageVersion(form)
-  await loadVersionImages(detail.versions)
+  const showSavedDetail = shouldShowSavedDetail(saveContext)
+  if (showSavedDetail) await loadVersionImages(detail.versions)
   const savedVersion = detail.versions.at(-1)
   if (savedVersion) {
     saveThoughtRecord(savedVersion.id, buildThoughtRecord(pending, savedVersion, savedMode))
   }
-  if (shouldShowSavedDetail(saveContext)) {
+  if (showSavedDetail) {
     selectedProjectId.value = detail.project.id
     selectedDetail.value = detail
     selectedVersionId.value = detail.versions.at(-1)?.id || null
@@ -537,7 +552,11 @@ function onUploadFile(event: Event) {
 }
 
 function versionSrc(version: ImageWorkspaceVersion) {
-  return versionObjectUrls.value[version.id] || imageVersionFileUrl(version.id, isAdmin.value)
+  return versionObjectUrls.value[version.id] || ''
+}
+
+function versionLoadLabel(version: ImageWorkspaceVersion) {
+  return versionLoadFailures.value[version.id] ? '图片加载失败' : '图片加载中'
 }
 
 function modeLabel(value: string) {
@@ -759,18 +778,21 @@ async function loadVersionImages(versions: ImageWorkspaceVersion[]) {
     if (!ids.has(Number(rawId))) {
       URL.revokeObjectURL(url)
       delete versionObjectUrls.value[Number(rawId)]
+      delete versionLoadFailures.value[Number(rawId)]
     }
   })
   await Promise.all(versions.map(async (version) => {
     if (versionObjectUrls.value[version.id]) return
+    versionLoadFailures.value = { ...versionLoadFailures.value, [version.id]: false }
     try {
       const blob = await fetchVersionBlob(version)
       versionObjectUrls.value = {
         ...versionObjectUrls.value,
         [version.id]: URL.createObjectURL(blob),
       }
+      versionLoadFailures.value = { ...versionLoadFailures.value, [version.id]: false }
     } catch {
-      // Keep direct URL fallback so broken auth or storage issues remain visible.
+      versionLoadFailures.value = { ...versionLoadFailures.value, [version.id]: true }
     }
   }))
 }
@@ -811,5 +833,13 @@ onBeforeUnmount(() => {
 
 .image-control-select :deep(.select-icon svg) {
   @apply h-4 w-4;
+}
+
+.ai-creation-composer {
+  @apply rounded-[1.75rem] border border-gray-200 bg-white p-2 shadow-xl shadow-gray-200/70 dark:border-dark-700 dark:bg-dark-900 dark:shadow-black/20;
+}
+
+.ai-creation-actions {
+  @apply flex flex-col gap-2 border-t border-gray-100 px-1 pt-2 dark:border-dark-800 sm:flex-row sm:items-center sm:justify-between;
 }
 </style>

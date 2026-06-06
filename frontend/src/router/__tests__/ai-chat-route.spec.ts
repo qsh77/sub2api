@@ -44,7 +44,7 @@ vi.mock('@/composables/useRoutePrefetch', () => ({
 }))
 
 describe('AI chat routes', () => {
-  it('registers the user AI chat route', async () => {
+  it('registers the user AI conversation route', async () => {
     const { default: router } = await import('@/router')
     const routes = router.getRoutes()
     const route = routes.find((record) => record.path === '/chat')
@@ -54,11 +54,12 @@ describe('AI chat routes', () => {
     expect(routeByName?.path).toBe('/chat')
     expect(route?.meta.requiresAuth).toBe(true)
     expect(route?.meta.requiresAdmin).toBe(false)
+    expect(route?.meta.title).toBe('AI Conversation')
     expect(route?.meta.titleKey).toBe('aiChat.title')
     expect(route?.meta.descriptionKey).toBe('aiChat.description')
   })
 
-  it('registers the admin AI chat route', async () => {
+  it('registers the admin AI conversation route', async () => {
     const { default: router } = await import('@/router')
     const routes = router.getRoutes()
     const route = routes.find((record) => record.path === '/admin/chat')
@@ -68,6 +69,7 @@ describe('AI chat routes', () => {
     expect(routeByName?.path).toBe('/admin/chat')
     expect(route?.meta.requiresAuth).toBe(true)
     expect(route?.meta.requiresAdmin).toBe(true)
+    expect(route?.meta.title).toBe('AI Conversation')
     expect(route?.meta.titleKey).toBe('aiChat.admin.title')
     expect(route?.meta.descriptionKey).toBe('aiChat.admin.description')
   })

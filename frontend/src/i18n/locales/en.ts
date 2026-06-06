@@ -361,7 +361,7 @@ export default {
     groups: 'Groups',
     channels: 'Channels',
     availableChannels: 'Available Channels',
-    aiChat: 'AI Chat',
+    aiChat: 'AI Conversation',
     imageGeneration: 'Image Generation',
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
@@ -1065,11 +1065,11 @@ export default {
   },
 
   aiChat: {
-    title: 'AI Chat',
-    description: 'Chat by selecting a group, key, and model',
+    title: 'AI Conversation',
+    description: 'Chat and create images in one workspace',
     admin: {
-      title: 'AI Chat',
-      description: 'Chat by selecting a group, key, and model'
+      title: 'AI Conversation',
+      description: 'Chat and create images in one workspace'
     }
   },
 
