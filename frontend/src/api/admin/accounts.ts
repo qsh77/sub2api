@@ -206,6 +206,31 @@ export async function refreshCredentials(id: number): Promise<Account> {
 }
 
 /**
+ * Apply / replace OAuth credentials or setup-token for an account that is
+ * currently in error state (mostly used for re-auth modals).
+ *
+ * Unlike `update()`, this endpoint:
+ * - never overwrites the whole `extra` JSONB (merges incrementally instead),
+ *   so persistent settings like `base_rpm`, `window_cost_limit`, `max_sessions`,
+ *   `quota_*` and `privacy_mode` are preserved
+ * - clears the account error and invalidates the token cache server-side
+ */
+export async function applyOAuthCredentials(
+  id: number,
+  payload: {
+    type: 'oauth' | 'setup-token'
+    credentials: Record<string, unknown>
+    extra?: Record<string, unknown>
+  }
+): Promise<Account> {
+  const { data } = await apiClient.post<Account>(
+    `/admin/accounts/${id}/apply-oauth-credentials`,
+    payload
+  )
+  return data
+}
+
+/**
  * Get account usage statistics
  * @param id - Account ID
  * @param days - Number of days (default: 30)
@@ -768,6 +793,7 @@ export const accountsAPI = {
   toggleStatus,
   testAccount,
   refreshCredentials,
+  applyOAuthCredentials,
   getStats,
   clearError,
   getUsage,

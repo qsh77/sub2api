@@ -11,6 +11,9 @@ import (
 const (
 	// monitorRequestTimeout 单次模型请求总超时（含 Body 读取）。
 	monitorRequestTimeout = 45 * time.Second
+	// monitorImageRequestTimeout 单次图片模型请求总超时。
+	// 图片生成经常需要 60-120s；用独立上限，避免普通文本监控被拖长。
+	monitorImageRequestTimeout = 180 * time.Second
 	// monitorPingTimeout HEAD 请求 endpoint origin 的超时。
 	monitorPingTimeout = 8 * time.Second
 	// monitorDegradedThreshold 主请求成功但耗时超过该阈值视为 degraded。
@@ -37,6 +40,10 @@ const (
 	monitorMessageMaxBytes = 500
 	// monitorResponseMaxBytes 单次模型响应最大读取字节，防止 OOM。
 	monitorResponseMaxBytes = 64 * 1024
+	// monitorImageResponseMaxBytes 图片检测响应最大读取字节。
+	// Images API 的 b64_json 成功响应通常远超 64KB；图片检测单次只请求 1 张 1024 图，
+	// 单独放宽上限，避免把成功 JSON 截断后误判为"2xx without image output"。
+	monitorImageResponseMaxBytes = 16 * 1024 * 1024
 	// monitorErrorBodySnippetMaxBytes 非 2xx 响应时保留上游 body 片段的最大字节数。
 	// 留 300 字节足够覆盖典型结构化错误（如 `{"error":{"message":"..."}}`），
 	// 又给 "upstream HTTP <status>: " 前缀留出余量，避免最终被 monitorMessageMaxBytes (500) 截得太狠。
@@ -49,6 +56,8 @@ const (
 	providerOpenAIPath = "/v1/chat/completions"
 	// providerOpenAIResponsesPath OpenAI Responses API 路径。
 	providerOpenAIResponsesPath = "/v1/responses"
+	// providerOpenAIImagesPath OpenAI Images API 路径。
+	providerOpenAIImagesPath = "/v1/images/generations"
 	// providerAnthropicPath Anthropic Messages 路径。
 	providerAnthropicPath = "/v1/messages"
 	// providerGeminiPathTemplate Gemini generateContent 路径模板（含 model 占位）。
@@ -97,6 +106,9 @@ const (
 	monitorTLSHandshakeTimeout = 10 * time.Second
 	// monitorResponseHeaderTimeout HTTP transport 等待响应头超时。
 	monitorResponseHeaderTimeout = 30 * time.Second
+	// monitorImageResponseHeaderTimeout 图片检测等待响应头超时。
+	// 非流式图片接口常在生成完成后才返回响应头；同时监控默认用 stream=true 尽量提前拿到响应头。
+	monitorImageResponseHeaderTimeout = 120 * time.Second
 	// monitorPingDiscardMaxBytes ping 时丢弃响应体的最大字节数。
 	monitorPingDiscardMaxBytes = 1024
 

@@ -14,12 +14,18 @@ import (
 	"time"
 
 	"github.com/tidwall/gjson"
-	"github.com/tidwall/sjson"
 )
 
 // monitorHTTPClient 共享一个 http.Client，避免每次检测重建 transport。
 // 自定义 Transport 在 dial 时强制再次校验 IP，防止 DNS rebinding 绕过 validateEndpoint。
 var monitorHTTPClient = newSSRFSafeHTTPClient(monitorRequestTimeout)
+
+// monitorImageHTTPClient 给图片生成监控使用。图片接口常在生成完成前不返回响应头，
+// 需要独立放宽，避免把慢图生成功能误判成网络错误。
+var monitorImageHTTPClient = newSSRFSafeHTTPClientWithResponseHeaderTimeout(
+	monitorImageRequestTimeout,
+	monitorImageResponseHeaderTimeout,
+)
 
 // monitorPingHTTPClient 用于 endpoint origin 的 HEAD ping，超时更短。
 var monitorPingHTTPClient = newSSRFSafeHTTPClient(monitorPingTimeout)
@@ -27,13 +33,17 @@ var monitorPingHTTPClient = newSSRFSafeHTTPClient(monitorPingTimeout)
 // newSSRFSafeHTTPClient 返回一个使用 safeDialContext 的 http.Client。
 // 仅供监控模块对外发起请求使用——所有目标都应是公网 endpoint。
 func newSSRFSafeHTTPClient(timeout time.Duration) *http.Client {
+	return newSSRFSafeHTTPClientWithResponseHeaderTimeout(timeout, monitorResponseHeaderTimeout)
+}
+
+func newSSRFSafeHTTPClientWithResponseHeaderTimeout(timeout, responseHeaderTimeout time.Duration) *http.Client {
 	tr := &http.Transport{
 		DialContext:           safeDialContext,
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          16,
 		IdleConnTimeout:       monitorIdleConnTimeout,
 		TLSHandshakeTimeout:   monitorTLSHandshakeTimeout,
-		ResponseHeaderTimeout: monitorResponseHeaderTimeout,
+		ResponseHeaderTimeout: responseHeaderTimeout,
 	}
 	return &http.Client{Timeout: timeout, Transport: tr}
 }
@@ -53,6 +63,7 @@ type CheckOptions struct {
 }
 
 const monitorOpenAIImagePrompt = "Generate a simple health-check image: a small blue circle centered on a white background. No text."
+const monitorAPIModeOpenAIImages = "images"
 
 // runCheckForModel 对单个 (provider, model) 做一次完整检测。
 // 不返回 error：所有失败都包装进 CheckResult.Status=error/failed。
@@ -88,7 +99,7 @@ func runCheckForModel(ctx context.Context, provider, endpoint, apiKey, model str
 		return res
 	}
 
-	if isOpenAIResponsesImageCheck(provider, effectiveCheckAPIMode(provider, model, opts), model) {
+	if isOpenAIImagesCheck(provider, model) {
 		imageCount := countOpenAIResponseImageOutputsFromJSONBytes([]byte(rawBody))
 		if imageCount == 0 {
 			imageCount = countOpenAIImageOutputsFromSSEBody(rawBody)
@@ -240,9 +251,6 @@ var providerOpenAIChatAdapter = providerAdapter{
 var providerOpenAIResponsesAdapter = providerAdapter{
 	buildPath: func(string) string { return providerOpenAIResponsesPath },
 	buildBody: func(model, prompt string) ([]byte, error) {
-		if isOpenAIImageGenerationModel(model) {
-			return buildOpenAIResponsesImageMonitorBody(model), nil
-		}
 		return json.Marshal(map[string]any{
 			"model":             model,
 			"instructions":      "You are a channel health-check endpoint. Answer the arithmetic challenge exactly and briefly.",
@@ -257,26 +265,36 @@ var providerOpenAIResponsesAdapter = providerAdapter{
 	textPath: "output.0.content.0.text",
 }
 
-func buildOpenAIResponsesImageMonitorBody(model string) []byte {
-	imageModel := strings.TrimSpace(model)
-	if imageModel == "" {
-		imageModel = "gpt-image-2"
-	}
-	body := []byte(`{"model":"","instructions":"Use the image_generation tool to create the requested health-check image.","input":"","stream":false,"store":false,"tool_choice":{"type":"image_generation"},"tools":[{"type":"image_generation","model":"","size":"1024x1024"}]}`)
-	body, _ = sjson.SetBytes(body, "model", openAIImagesResponsesMainModel)
-	body, _ = sjson.SetBytes(body, "input", monitorOpenAIImagePrompt)
-	body, _ = sjson.SetBytes(body, "tools.0.model", imageModel)
-	return body
+//nolint:gochecknoglobals // 适配器表是只读静态数据，初始化后不变更。
+var providerOpenAIImagesAdapter = providerAdapter{
+	buildPath: func(string) string { return providerOpenAIImagesPath },
+	buildBody: func(model, _ string) ([]byte, error) {
+		return json.Marshal(map[string]any{
+			"model":           model,
+			"prompt":          monitorOpenAIImagePrompt,
+			"n":               1,
+			"response_format": "b64_json",
+			"stream":          true,
+		})
+	},
+	buildHeaders: func(apiKey string) map[string]string {
+		return map[string]string{
+			"Authorization": "Bearer " + apiKey,
+			"Accept":        "text/event-stream",
+		}
+	},
+	textPath: "",
 }
 
-func isOpenAIResponsesImageCheck(provider, apiMode, model string) bool {
-	return provider == MonitorProviderOpenAI &&
-		defaultAPIMode(apiMode) == MonitorAPIModeResponses &&
-		isOpenAIImageGenerationModel(model)
+func isOpenAIImagesCheck(provider, model string) bool {
+	return provider == MonitorProviderOpenAI && isOpenAIImageGenerationModel(model)
 }
 
 // providerAdapterFor 按 provider + api_mode 选择具体 adapter。
-func providerAdapterFor(provider, apiMode string) (providerAdapter, string, bool) {
+func providerAdapterFor(provider, model, apiMode string) (providerAdapter, string, bool) {
+	if provider == MonitorProviderOpenAI && isOpenAIImageGenerationModel(model) {
+		return providerOpenAIImagesAdapter, monitorAPIModeOpenAIImages, true
+	}
 	if provider == MonitorProviderOpenAI && defaultAPIMode(apiMode) == MonitorAPIModeResponses {
 		return providerOpenAIResponsesAdapter, MonitorAPIModeResponses, true
 	}
@@ -296,15 +314,15 @@ func isSupportedProvider(p string) bool {
 //
 // 返回值：
 //   - extractedText: 按 textPath 抽出的成功文本，仅在 status 2xx 时有意义；非 2xx 时通常为空串
-//   - rawBody: 完整响应体的字符串形式（已被 monitorResponseMaxBytes 截断），用于错误路径保留上游真实回包
+//   - rawBody: 完整响应体的字符串形式（按请求类型限制最大读取字节），用于错误路径保留上游真实回包
 //   - status: HTTP 状态码
 //   - err: 网络 / 序列化错误
 func callProvider(ctx context.Context, provider, endpoint, apiKey, model, prompt string, opts *CheckOptions) (extractedText, rawBody string, status int, err error) {
-	requestedAPIMode := effectiveCheckAPIMode(provider, model, opts)
+	requestedAPIMode := checkAPIMode(opts)
 	if err := validateAPIMode(provider, requestedAPIMode); err != nil {
 		return "", "", 0, err
 	}
-	adapter, apiMode, ok := providerAdapterFor(provider, requestedAPIMode)
+	adapter, apiMode, ok := providerAdapterFor(provider, model, requestedAPIMode)
 	if !ok {
 		return "", "", 0, fmt.Errorf("unsupported provider %q", provider)
 	}
@@ -314,14 +332,63 @@ func callProvider(ctx context.Context, provider, endpoint, apiKey, model, prompt
 	}
 	headers := mergeHeaders(adapter.buildHeaders(apiKey), opts)
 	full := joinURL(endpoint, adapter.buildPath(model))
-	respBytes, status, err := postRawJSON(ctx, full, body, headers)
+	responseLimit := int64(monitorResponseMaxBytes)
+	client := monitorHTTPClient
+	isImageAPI := provider == MonitorProviderOpenAI && apiMode == monitorAPIModeOpenAIImages
+	if isImageAPI {
+		responseLimit = int64(monitorImageResponseMaxBytes)
+		client = monitorImageHTTPClient
+	}
+	respBytes, status, err := postRawJSON(ctx, client, full, body, headers, responseLimit)
 	if err != nil {
 		return "", "", status, err
+	}
+	if isImageAPI && shouldRetryOpenAIImageWithoutStream(status, respBytes) {
+		retryBody, retryHeaders, retryErr := buildOpenAIImageNonStreamingRetry(body, headers)
+		if retryErr == nil {
+			respBytes, status, err = postRawJSON(ctx, client, full, retryBody, retryHeaders, responseLimit)
+			if err != nil {
+				return "", "", status, err
+			}
+		}
 	}
 	if provider == MonitorProviderOpenAI && apiMode == MonitorAPIModeResponses {
 		return extractOpenAIResponsesText(respBytes), string(respBytes), status, nil
 	}
 	return gjson.GetBytes(respBytes, adapter.textPath).String(), string(respBytes), status, nil
+}
+
+func shouldRetryOpenAIImageWithoutStream(status int, body []byte) bool {
+	if status != http.StatusBadRequest && status != http.StatusUnprocessableEntity {
+		return false
+	}
+	lower := strings.ToLower(string(body))
+	if !strings.Contains(lower, "stream") {
+		return false
+	}
+	return strings.Contains(lower, "unsupported") ||
+		strings.Contains(lower, "not supported") ||
+		strings.Contains(lower, "unrecognized") ||
+		strings.Contains(lower, "unknown") ||
+		strings.Contains(lower, "invalid")
+}
+
+func buildOpenAIImageNonStreamingRetry(body []byte, headers map[string]string) ([]byte, map[string]string, error) {
+	var parsed map[string]any
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil, nil, fmt.Errorf("unmarshal image retry body: %w", err)
+	}
+	delete(parsed, "stream")
+	retryBody, err := json.Marshal(parsed)
+	if err != nil {
+		return nil, nil, fmt.Errorf("marshal image retry body: %w", err)
+	}
+	retryHeaders := make(map[string]string, len(headers)+1)
+	for k, v := range headers {
+		retryHeaders[k] = v
+	}
+	retryHeaders["Accept"] = "application/json"
+	return retryBody, retryHeaders, nil
 }
 
 // extractOpenAIResponsesText 聚合 Responses API 的最终 assistant 文本。
@@ -444,6 +511,7 @@ func buildRequestBody(adapter providerAdapter, provider, apiMode, model, prompt 
 var bodyMergeKeyDenyList = map[string]map[string]bool{
 	MonitorProviderOpenAI + ":" + MonitorAPIModeChatCompletions: {"model": true, "messages": true, "stream": true},
 	MonitorProviderOpenAI + ":" + MonitorAPIModeResponses:       {"model": true, "instructions": true, "input": true, "stream": true},
+	MonitorProviderOpenAI + ":" + monitorAPIModeOpenAIImages:    {"model": true, "prompt": true, "n": true, "response_format": true, "stream": true},
 	MonitorProviderAnthropic:                                    {"model": true, "messages": true},
 	MonitorProviderGemini:                                       {"contents": true},
 }
@@ -453,14 +521,6 @@ func checkAPIMode(opts *CheckOptions) string {
 		return MonitorAPIModeChatCompletions
 	}
 	return defaultAPIMode(opts.APIMode)
-}
-
-func effectiveCheckAPIMode(provider, model string, opts *CheckOptions) string {
-	mode := checkAPIMode(opts)
-	if provider == MonitorProviderOpenAI && isOpenAIImageGenerationModel(model) {
-		return MonitorAPIModeResponses
-	}
-	return mode
 }
 
 func bodyMergeDenyKey(provider, apiMode string) string {
@@ -511,7 +571,7 @@ func hasNonEmptyBodyValue(v any) bool {
 
 // postRawJSON 发送 POST + 已序列化好的 JSON 字节，限制响应体大小，返回响应字节、HTTP status、错误。
 // adapter 自行 marshal 是为了精确控制字段顺序与类型，所以这里直接收 []byte 而不是 any。
-func postRawJSON(ctx context.Context, fullURL string, payload []byte, headers map[string]string) ([]byte, int, error) {
+func postRawJSON(ctx context.Context, client *http.Client, fullURL string, payload []byte, headers map[string]string, responseLimit int64) ([]byte, int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, 0, fmt.Errorf("build request: %w", err)
@@ -522,13 +582,19 @@ func postRawJSON(ctx context.Context, fullURL string, payload []byte, headers ma
 		req.Header.Set(k, v)
 	}
 
-	resp, err := monitorHTTPClient.Do(req)
+	if client == nil {
+		client = monitorHTTPClient
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, 0, fmt.Errorf("do request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, monitorResponseMaxBytes))
+	if responseLimit <= 0 {
+		responseLimit = monitorResponseMaxBytes
+	}
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, responseLimit))
 	if err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("read body: %w", err)
 	}

@@ -6,16 +6,27 @@
           新对话
         </button>
         <div class="mt-4 flex-1 space-y-2 overflow-y-auto">
-          <button
-            v-for="project in projects"
-            :key="project.id"
-            type="button"
-            class="w-full rounded-2xl border bg-white px-3 py-3 text-left text-sm shadow-sm transition dark:bg-dark-800"
-            :class="project.id === selectedProjectId ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white' : 'border-gray-100 text-gray-600 hover:border-gray-200 dark:border-dark-700 dark:text-dark-300 dark:hover:border-dark-600'"
-            @click="selectProject(project.id)"
+          <div
+            v-for="record in sidebarRecords"
+            :key="record.id"
+            class="group flex w-full min-w-0 items-center gap-1 rounded-2xl border bg-white shadow-sm transition dark:bg-dark-800"
+            :class="isSidebarRecordActive(record) ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white' : 'border-gray-100 text-gray-600 hover:border-gray-200 dark:border-dark-700 dark:text-dark-300 dark:hover:border-dark-600'"
           >
-            <span class="block truncate font-medium">{{ project.title || '未命名图片' }}</span>
-          </button>
+            <button type="button" class="flex min-w-0 flex-1 items-center gap-2 px-3 py-3 text-left text-sm" @click="selectSidebarRecord(record)">
+              <Icon :name="record.mode === 'image' ? 'sparkles' : 'chat'" size="sm" class="shrink-0" />
+              <span class="block min-w-0 flex-1 truncate font-medium">{{ record.title }}</span>
+            </button>
+            <button
+              v-if="canDeleteSidebarRecord(record)"
+              type="button"
+              class="mr-2 hidden rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500 disabled:cursor-wait disabled:opacity-50 group-hover:block dark:hover:bg-dark-700"
+              :title="deleteSidebarRecordTitle(record)"
+              :disabled="deletingRecordId === record.id"
+              @click.stop="deleteSidebarRecord(record)"
+            >
+              <Icon name="trash" size="xs" />
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -91,6 +102,8 @@
                   :alt="`generated-image-${item.version.id}`"
                   class="max-h-[460px] w-full max-w-[560px] cursor-pointer object-contain"
                   @click="selectVersionForEdit(item.version.id)"
+                  @error="markVersionImageFailed(item.version)"
+                  @load="markVersionImageLoaded(item.version)"
                 />
                 <div v-else class="flex h-44 w-72 max-w-full items-center justify-center text-sm text-gray-400 dark:text-dark-400">
                   {{ versionLoadLabel(item.version) }}
@@ -207,6 +220,7 @@ import {
   supportsImageWorkspaceModel,
   uploadImageVersion,
   DEFAULT_IMAGE_MODELS,
+  deleteImageProject,
   type GeneratedImage,
   type ImageSizeOption,
   type ImageWorkspaceProjectDetail,
@@ -215,6 +229,18 @@ import {
 } from '@/api/imageGeneration'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import {
+  chatConversationRecord,
+  imageProjectRecord,
+  readStoredChatConversations,
+  readStoredChatSelection,
+  readStoredImageProjectSelection,
+  sortAiCreationRecords,
+  writeStoredChatConversations,
+  writeStoredChatSelection,
+  writeStoredImageProjectSelection,
+  type AiCreationSidebarRecord,
+} from '@/utils/aiCreationRecords'
 import type { AdminGroup, ApiKey } from '@/types'
 
 type WorkspaceScope = 'user' | 'admin'
@@ -260,6 +286,7 @@ const groups = ref<AdminGroup[]>([])
 const activeKeys = ref<ApiKey[]>([])
 const models = ref<string[]>([])
 const projects = ref<ImageWorkspaceProjectSummary[]>([])
+const chatRecords = ref<AiCreationSidebarRecord[]>([])
 const selectedDetail = ref<ImageWorkspaceProjectDetail | null>(null)
 const selectedProjectId = ref<number | null>(null)
 const selectedVersionId = ref<number | null>(null)
@@ -281,6 +308,7 @@ const generating = ref(false)
 const chatEl = ref<HTMLElement | null>(null)
 const promptEl = ref<HTMLTextAreaElement | null>(null)
 const fileInputEl = ref<HTMLInputElement | null>(null)
+const deletingRecordId = ref('')
 let controller: AbortController | null = null
 let pendingTimer = 0
 let keyLoadRequestId = 0
@@ -308,6 +336,10 @@ const chatItems = computed(() => (selectedDetail.value?.versions || []).map((ver
   version,
   prompt: version.prompt || modeLabel(version.mode),
 })))
+const sidebarRecords = computed(() => sortAiCreationRecords([
+  ...chatRecords.value,
+  ...projects.value.map(imageProjectRecord),
+]))
 const visiblePendingMessages = computed(() => pendingMessages.value.filter((message) => message.projectId === selectedProjectId.value))
 const effectiveMode = computed<WorkspaceMode>(() => {
   if (uploadFile.value) return 'upload'
@@ -358,6 +390,7 @@ watch(selectedDetail, (detail) => {
 
 async function loadData() {
   loading.value = true
+  chatRecords.value = readStoredChatConversations(props.scope).map(chatConversationRecord)
   try {
     if (isAdmin.value) {
       groups.value = (await adminAPI.groups.getAll('openai')).filter((item) => item.status === 'active' && item.allow_image_generation !== false)
@@ -404,6 +437,7 @@ async function loadWorkspace() {
 async function selectProject(id: number) {
   clearComposerDraft()
   selectedProjectId.value = id
+  writeStoredImageProjectSelection(props.scope, id)
   selectedDetail.value = isAdmin.value ? await adminAPI.images.get(id) : await getImageProject(id)
   if (!selectedDetail.value.versions.some((item) => item.id === selectedVersionId.value)) {
     selectedVersionId.value = selectedDetail.value.versions.at(-1)?.id || null
@@ -414,10 +448,74 @@ function startNewProject() {
   selectedProjectId.value = null
   selectedVersionId.value = null
   selectedDetail.value = null
+  writeStoredImageProjectSelection(props.scope, null)
   pendingMessages.value = []
   expandedThoughtKey.value = null
   clearComposerDraft()
   void nextTick(() => promptEl.value?.focus())
+}
+
+function selectSidebarRecord(record: AiCreationSidebarRecord) {
+  if (record.mode === 'dialogue' && record.conversationId) {
+    writeStoredChatSelection(props.scope, record.conversationId)
+    emit('mode-change', 'dialogue')
+    return
+  }
+  if (record.projectId) void selectProject(record.projectId)
+}
+
+function canDeleteSidebarRecord(record: AiCreationSidebarRecord) {
+  return (record.mode === 'dialogue' && !!record.conversationId) || (record.mode === 'image' && !!record.projectId)
+}
+
+function deleteSidebarRecordTitle(record: AiCreationSidebarRecord) {
+  return record.mode === 'image' ? '删除作画记录' : '删除对话'
+}
+
+async function deleteSidebarRecord(record: AiCreationSidebarRecord) {
+  if (record.mode === 'dialogue' && record.conversationId) {
+    deleteChatConversationRecord(record.conversationId)
+    return
+  }
+  if (record.mode === 'image' && record.projectId) {
+    await deleteImageProjectRecord(record.projectId, record.id)
+  }
+}
+
+function deleteChatConversationRecord(conversationId: string) {
+  const conversations = readStoredChatConversations(props.scope).filter((item) => item.id !== conversationId)
+  writeStoredChatConversations(props.scope, conversations)
+  chatRecords.value = conversations.map(chatConversationRecord)
+  if (readStoredChatSelection(props.scope) === conversationId) {
+    writeStoredChatSelection(props.scope, conversations[0]?.id || null)
+  }
+}
+
+async function deleteImageProjectRecord(projectId: number, recordId: string) {
+  if (deletingRecordId.value) return
+  deletingRecordId.value = recordId
+  try {
+    if (isAdmin.value) await adminAPI.images.delete(projectId)
+    else await deleteImageProject(projectId)
+    const nextProjects = projects.value.filter((project) => project.id !== projectId)
+    projects.value = nextProjects
+    if (selectedProjectId.value === projectId) {
+      selectedProjectId.value = null
+      selectedVersionId.value = null
+      selectedDetail.value = null
+      pendingMessages.value = pendingMessages.value.filter((message) => message.projectId !== projectId)
+      const nextProjectId = preferredProjectId(nextProjects)
+      if (nextProjectId) await selectProject(nextProjectId)
+      else writeStoredImageProjectSelection(props.scope, null)
+    } else if (readStoredImageProjectSelection(props.scope) === projectId) {
+      writeStoredImageProjectSelection(props.scope, nextProjects[0]?.id || null)
+    }
+    appStore.showSuccess?.('已删除')
+  } catch (err: unknown) {
+    appStore.showError(readErrorText(err))
+  } finally {
+    deletingRecordId.value = ''
+  }
 }
 
 function selectVersionForEdit(versionId: number) {
@@ -531,13 +629,14 @@ async function saveBlob(blob: Blob, savedMode: 'generation' | 'edit' | 'upload',
   }
   const detail = await uploadImageVersion(form)
   const showSavedDetail = shouldShowSavedDetail(saveContext)
-  if (showSavedDetail) await loadVersionImages(detail.versions)
   const savedVersion = detail.versions.at(-1)
+  if (showSavedDetail && savedVersion) setVersionImageBlob(savedVersion, blob)
   if (savedVersion) {
     saveThoughtRecord(savedVersion.id, buildThoughtRecord(pending, savedVersion, savedMode))
   }
   if (showSavedDetail) {
     selectedProjectId.value = detail.project.id
+    writeStoredImageProjectSelection(props.scope, detail.project.id)
     selectedDetail.value = detail
     selectedVersionId.value = detail.versions.at(-1)?.id || null
   }
@@ -559,6 +658,32 @@ function versionLoadLabel(version: ImageWorkspaceVersion) {
   return versionLoadFailures.value[version.id] ? '图片加载失败' : '图片加载中'
 }
 
+function markVersionImageFailed(version: ImageWorkspaceVersion) {
+  const currentUrl = versionObjectUrls.value[version.id]
+  if (currentUrl?.startsWith('blob:')) URL.revokeObjectURL(currentUrl)
+  const nextUrls = { ...versionObjectUrls.value }
+  delete nextUrls[version.id]
+  versionObjectUrls.value = nextUrls
+  versionLoadFailures.value = { ...versionLoadFailures.value, [version.id]: true }
+}
+
+function setVersionImageBlob(version: ImageWorkspaceVersion, blob: Blob) {
+  if (blob.type && !blob.type.startsWith('image/')) return
+  const currentUrl = versionObjectUrls.value[version.id]
+  if (currentUrl?.startsWith('blob:')) URL.revokeObjectURL(currentUrl)
+  versionObjectUrls.value = {
+    ...versionObjectUrls.value,
+    [version.id]: URL.createObjectURL(blob),
+  }
+  versionLoadFailures.value = { ...versionLoadFailures.value, [version.id]: false }
+}
+
+function markVersionImageLoaded(version: ImageWorkspaceVersion) {
+  if (versionLoadFailures.value[version.id]) {
+    versionLoadFailures.value = { ...versionLoadFailures.value, [version.id]: false }
+  }
+}
+
 function modeLabel(value: string) {
   if (value === 'edit') return '编辑图片'
   if (value === 'mask' || value === 'mask_edit') return '局部编辑图片'
@@ -567,6 +692,8 @@ function modeLabel(value: string) {
 }
 
 function preferredProjectId(items: ImageWorkspaceProjectSummary[]) {
+  const storedId = readStoredImageProjectSelection(props.scope)
+  if (storedId && items.some((project) => project.id === storedId)) return storedId
   return items.find((project) => project.version_count > 0)?.id || items[0]?.id || null
 }
 
@@ -786,6 +913,9 @@ async function loadVersionImages(versions: ImageWorkspaceVersion[]) {
     versionLoadFailures.value = { ...versionLoadFailures.value, [version.id]: false }
     try {
       const blob = await fetchVersionBlob(version)
+      if (blob.type && !blob.type.startsWith('image/')) {
+        throw new Error(`invalid image response type: ${blob.type}`)
+      }
       versionObjectUrls.value = {
         ...versionObjectUrls.value,
         [version.id]: URL.createObjectURL(blob),
@@ -795,6 +925,10 @@ async function loadVersionImages(versions: ImageWorkspaceVersion[]) {
       versionLoadFailures.value = { ...versionLoadFailures.value, [version.id]: true }
     }
   }))
+}
+
+function isSidebarRecordActive(record: AiCreationSidebarRecord) {
+  return record.mode === 'image' && record.projectId === selectedProjectId.value
 }
 
 async function fetchVersionBlob(version: ImageWorkspaceVersion) {

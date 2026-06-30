@@ -3,7 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 
 import ImageGenerationView from '../ImageGenerationView.vue'
 
-const { list, getAvailable, generateImage, editImage, fetchImageVersionBlob, listImageProjects, getImageProject, uploadImageVersion, showError, showSuccess } = vi.hoisted(() => ({
+const { list, getAvailable, generateImage, editImage, fetchImageVersionBlob, listImageProjects, getImageProject, uploadImageVersion, deleteImageProject, showError, showSuccess } = vi.hoisted(() => ({
   list: vi.fn(),
   getAvailable: vi.fn(),
   generateImage: vi.fn(),
@@ -12,6 +12,7 @@ const { list, getAvailable, generateImage, editImage, fetchImageVersionBlob, lis
   listImageProjects: vi.fn(),
   getImageProject: vi.fn(),
   uploadImageVersion: vi.fn(),
+  deleteImageProject: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
 }))
@@ -31,6 +32,7 @@ vi.mock('@/api/imageGeneration', async () => {
     listImageProjects,
     getImageProject,
     uploadImageVersion,
+    deleteImageProject,
   }
 })
 
@@ -197,6 +199,8 @@ describe('ImageGenerationView', () => {
     listImageProjects.mockReset()
     getImageProject.mockReset()
     uploadImageVersion.mockReset()
+    deleteImageProject.mockReset()
+    deleteImageProject.mockResolvedValue(undefined)
     showError.mockReset()
     showSuccess.mockReset()
     fetchImageVersionBlob.mockResolvedValue(new Blob(['saved'], { type: 'image/png' }))
@@ -222,6 +226,94 @@ describe('ImageGenerationView', () => {
     await wrapper.find('textarea').setValue('a clean vector dashboard')
 
     expect(wrapper.find('[data-testid="generate-image"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('shows chat conversations in the shared record list and stores the selected chat', async () => {
+    localStorage.setItem('sub2api:ai-chat:user:v1', JSON.stringify([{
+      id: 'chat-1',
+      title: 'Chat about styles',
+      messages: [{ id: 'message-1', role: 'user', content: 'hi', createdAt: 1 }],
+      groupId: 1,
+      keyName: 'Enabled key',
+      model: 'gpt-5.4',
+      createdAt: 1,
+      updatedAt: 2,
+    }]))
+    const wrapper = await mountView()
+
+    const chatRecord = wrapper.findAll('button').find((button) => button.text().includes('Chat about styles'))
+    expect(chatRecord).toBeTruthy()
+
+    await chatRecord!.trigger('click')
+
+    expect(localStorage.getItem('sub2api:ai-creation:user:selected-chat:v1')).toBe('chat-1')
+  })
+
+  it('deletes chat conversations from the shared image sidebar', async () => {
+    localStorage.setItem('sub2api:ai-chat:user:v1', JSON.stringify([{
+      id: 'chat-1',
+      title: 'Chat about styles',
+      messages: [{ id: 'message-1', role: 'user', content: 'hi', createdAt: 1 }],
+      groupId: 1,
+      keyName: 'Enabled key',
+      model: 'gpt-5.4',
+      createdAt: 1,
+      updatedAt: 2,
+    }]))
+    localStorage.setItem('sub2api:ai-creation:user:selected-chat:v1', 'chat-1')
+    const wrapper = await mountView()
+
+    expect(wrapper.text()).toContain('Chat about styles')
+    await wrapper.get('button[title="删除对话"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Chat about styles')
+    expect(localStorage.getItem('sub2api:ai-chat:user:v1')).toBe('[]')
+    expect(localStorage.getItem('sub2api:ai-creation:user:selected-chat:v1')).toBeNull()
+  })
+
+  it('deletes image projects from the shared image sidebar and selects the next project', async () => {
+    const detailFor = (id: number) => ({
+      project: { id, user_id: 1, title: id === 7 ? 'Old image' : 'Other image', cover_version_id: id, status: 'active', created_at: '', updated_at: '' },
+      versions: [{
+        id,
+        project_id: id,
+        user_id: 1,
+        mode: 'generation',
+        prompt: id === 7 ? 'old image' : 'other image',
+        model: 'gpt-image-2',
+        size: '1024x1024',
+        mime_type: 'image/png',
+        file_size_bytes: 5,
+        sha256: '',
+        width: 1,
+        height: 1,
+        created_at: '',
+      }],
+    })
+    const wrapper = await mountView([apiKey()], {
+      projects: {
+        items: [
+          { id: 7, user_id: 1, title: 'Old image', cover_version_id: 7, status: 'active', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-02T00:00:00Z', version_count: 1 },
+          { id: 8, user_id: 1, title: 'Other image', cover_version_id: 8, status: 'active', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', version_count: 1 },
+        ],
+        total: 2,
+        page: 1,
+        page_size: 50,
+        pages: 1,
+      },
+      detail: detailFor,
+    })
+
+    await wrapper.findAll('button[title="删除作画记录"]')[0].trigger('click')
+    await flushPromises()
+
+    expect(deleteImageProject).toHaveBeenCalledWith(7)
+    expect(getImageProject).toHaveBeenLastCalledWith(8)
+    expect(localStorage.getItem('sub2api:ai-creation:user:selected-image-project:v1')).toBe('8')
+    expect(wrapper.text()).not.toContain('Old image')
+    expect(wrapper.text()).toContain('Other image')
+    expect(showSuccess).toHaveBeenCalledWith('已删除')
   })
 
   it('selects an image-enabled key when other active keys cannot generate images', async () => {
@@ -305,11 +397,28 @@ describe('ImageGenerationView', () => {
       { signal: expect.any(AbortSignal) },
     )
     expect(uploadImageVersion).toHaveBeenCalled()
-    expect(fetchImageVersionBlob).toHaveBeenCalledWith(1, false)
+    expect(fetchImageVersionBlob).not.toHaveBeenCalled()
     expect(wrapper.find('img[alt="generated-image-1"]').attributes('src')).toBe('blob:mock-1')
     expect(wrapper.find('img[alt="generated-image-1"]').classes()).toContain('max-w-[560px]')
     expect(wrapper.find('a[download="image-1.png"]').attributes('href')).toBe('blob:mock-1')
     expect(showSuccess).toHaveBeenCalledWith('图片已保存')
+  })
+
+  it('keeps the freshly generated image visible when the saved file endpoint is not ready', async () => {
+    fetchImageVersionBlob.mockResolvedValue(new Blob(['{"message":"not image"}'], { type: 'application/json' }))
+    generateImage.mockResolvedValue({
+      images: [{ url: 'data:image/png;base64,aGVsbG8=' }],
+      raw: {},
+    })
+    const wrapper = await mountView()
+
+    await wrapper.find('textarea').setValue('a fresh image')
+    await wrapper.find('[data-testid="generate-image"]').trigger('click')
+    await flushPromises()
+
+    expect(fetchImageVersionBlob).not.toHaveBeenCalled()
+    expect(wrapper.find('img[alt="generated-image-1"]').attributes('src')).toBe('blob:mock-1')
+    expect(wrapper.text()).not.toContain('图片加载失败')
   })
 
   it('waits for authenticated saved image blobs instead of rendering protected file URLs', async () => {
@@ -350,6 +459,42 @@ describe('ImageGenerationView', () => {
     await flushPromises()
 
     expect(wrapper.find('img[alt="generated-image-7"]').attributes('src')).toBe('blob:mock-1')
+  })
+
+  it('shows a load failure instead of a broken image when the saved file response is not an image', async () => {
+    fetchImageVersionBlob.mockResolvedValue(new Blob(['{"message":"not image"}'], { type: 'application/json' }))
+    const wrapper = await mountView([apiKey()], {
+      projects: {
+        items: [{ id: 7, user_id: 1, title: 'Saved', cover_version_id: 7, status: 'active', created_at: '', updated_at: '', version_count: 1 }],
+        total: 1,
+        page: 1,
+        page_size: 50,
+        pages: 1,
+      },
+      detail: {
+        project: { id: 7, user_id: 1, title: 'Saved', cover_version_id: 7, status: 'active', created_at: '', updated_at: '' },
+        versions: [{
+          id: 7,
+          project_id: 7,
+          user_id: 1,
+          mode: 'generation',
+          prompt: 'saved image',
+          model: 'gpt-image-2',
+          size: '1024x1024',
+          mime_type: 'image/png',
+          file_size_bytes: 5,
+          sha256: '',
+          width: 1,
+          height: 1,
+          created_at: '',
+        }],
+      },
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('img[alt="generated-image-7"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('图片加载失败')
   })
 
   it('moves prompt into chat immediately and clears the composer while generating', async () => {
@@ -537,8 +682,8 @@ describe('ImageGenerationView', () => {
 
   it('previews an uploaded image while it is being saved', async () => {
     const saving = deferred<Awaited<ReturnType<typeof uploadImageVersion>>>()
-    uploadImageVersion.mockReturnValue(saving.promise)
     const wrapper = await mountView()
+    uploadImageVersion.mockReturnValue(saving.promise)
     const file = new File(['image'], 'upload.png', { type: 'image/png' })
     const input = wrapper.find('input[type="file"]').element as HTMLInputElement
     Object.defineProperty(input, 'files', { value: [file] })

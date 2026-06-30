@@ -170,6 +170,18 @@ func TestOpenAIImageOutputCounterCountsImagesAPIStreamShapes(t *testing.T) {
 	require.Equal(t, 3, dataCounter.Count())
 }
 
+func TestOpenAIImageOutputCounterCountsUsageFallbacks(t *testing.T) {
+	body := []byte(`{"output":[],"tool_usage":{"image_gen":{"images":2}}}`)
+	require.Equal(t, 2, countOpenAIResponseImageOutputsFromJSONBytes(body))
+
+	nestedBody := []byte(`{"response":{"output":[],"usage":{"images":1}}}`)
+	require.Equal(t, 1, countOpenAIResponseImageOutputsFromJSONBytes(nestedBody))
+
+	sseBody := "data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"tool_usage\":{\"image_gen\":{\"images\":1}}}}\n\n" +
+		"data: [DONE]\n\n"
+	require.Equal(t, 1, countOpenAIImageOutputsFromSSEBody(sseBody))
+}
+
 func TestOpenAIImageOutputCounterCountsMultilineSSEDataPayload(t *testing.T) {
 	counter := newOpenAIImageOutputCounter()
 	counter.AddSSEData([]byte("{\"type\":\"image_generation.completed\",\n\"b64_json\":\"final-a\"}"))

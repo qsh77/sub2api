@@ -8,20 +8,22 @@
         </button>
         <div class="mt-4 flex-1 space-y-1 overflow-y-auto">
           <div
-            v-for="conversation in sortedConversations"
-            :key="conversation.id"
+            v-for="record in sidebarRecords"
+            :key="record.id"
             class="group flex w-full items-center gap-1 rounded-lg transition"
-            :class="conversation.id === activeConversationId ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-800 dark:text-white' : 'text-gray-600 hover:bg-white dark:text-dark-300 dark:hover:bg-dark-800'"
+            :class="isSidebarRecordActive(record) ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-800 dark:text-white' : 'text-gray-600 hover:bg-white dark:text-dark-300 dark:hover:bg-dark-800'"
           >
-            <button type="button" class="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm" @click="selectConversation(conversation.id)">
-              <Icon name="chat" size="sm" class="shrink-0" />
-              <span class="min-w-0 flex-1 truncate">{{ conversation.title }}</span>
+            <button type="button" class="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm" @click="selectSidebarRecord(record)">
+              <Icon :name="record.mode === 'image' ? 'sparkles' : 'chat'" size="sm" class="shrink-0" />
+              <span class="min-w-0 flex-1 truncate">{{ record.title }}</span>
             </button>
             <button
+              v-if="canDeleteSidebarRecord(record)"
               type="button"
-              class="mr-2 hidden rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500 group-hover:block dark:hover:bg-dark-700"
-              title="删除"
-              @click="deleteConversation(conversation.id)"
+              class="mr-2 hidden rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500 disabled:cursor-wait disabled:opacity-50 group-hover:block dark:hover:bg-dark-700"
+              :title="deleteSidebarRecordTitle(record)"
+              :disabled="deletingRecordId === record.id"
+              @click.stop="deleteSidebarRecord(record)"
             >
               <Icon name="trash" size="xs" />
             </button>
@@ -90,21 +92,33 @@
                   v-if="hasTrace(message)"
                   class="mb-2 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:border-dark-700 dark:bg-dark-900 dark:text-dark-300"
                 >
-                  <div class="flex flex-wrap items-center gap-2 font-medium text-gray-800 dark:text-dark-100">
-                    <Icon name="brain" size="xs" />
-                    <span>思考链路</span>
-                    <span class="text-gray-400">·</span>
-                    <span>{{ traceStatus(message) }}</span>
-                    <template v-if="thinkingDurationMs(message) !== null">
+                  <button
+                    type="button"
+                    class="flex w-full items-start justify-between gap-3 text-left"
+                    :aria-expanded="!isTraceCollapsed(message)"
+                    :title="isTraceCollapsed(message) ? '展开思考链路' : '收起思考链路'"
+                    @click="toggleTrace(message)"
+                  >
+                    <span class="flex min-w-0 flex-1 flex-wrap items-center gap-2 font-medium text-gray-800 dark:text-dark-100">
+                      <Icon name="brain" size="xs" />
+                      <span>思考链路</span>
                       <span class="text-gray-400">·</span>
-                      <span>思考时间 {{ formatDuration(thinkingDurationMs(message) || 0) }}</span>
-                    </template>
-                    <template v-if="totalDurationMs(message) !== null">
-                      <span class="text-gray-400">·</span>
-                      <span>总耗时 {{ formatDuration(totalDurationMs(message) || 0) }}</span>
-                    </template>
-                  </div>
-                  <div class="mt-2 space-y-2">
+                      <span>{{ traceStatus(message) }}</span>
+                      <template v-if="thinkingDurationMs(message) !== null">
+                        <span class="text-gray-400">·</span>
+                        <span>思考时间 {{ formatDuration(thinkingDurationMs(message) || 0) }}</span>
+                      </template>
+                      <template v-if="totalDurationMs(message) !== null">
+                        <span class="text-gray-400">·</span>
+                        <span>总耗时 {{ formatDuration(totalDurationMs(message) || 0) }}</span>
+                      </template>
+                    </span>
+                    <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-dark-800 dark:hover:text-dark-100">
+                      <Icon :name="isTraceCollapsed(message) ? 'chevronRight' : 'chevronDown'" size="xs" />
+                      <span class="sr-only">{{ isTraceCollapsed(message) ? '展开' : '收起' }}</span>
+                    </span>
+                  </button>
+                  <div v-if="!isTraceCollapsed(message)" class="mt-2 space-y-2">
                     <div v-if="message.modelName || message.groupName || message.keyName" class="flex flex-wrap gap-1.5">
                       <span v-if="message.groupName" class="ai-chat-trace-pill">{{ message.groupName }}</span>
                       <span v-if="message.keyName" class="ai-chat-trace-pill">{{ message.keyName }}</span>
@@ -114,6 +128,12 @@
                       <div v-for="event in message.traceEvents" :key="`${event.at}-${event.label}`" class="flex gap-2">
                         <span class="w-12 shrink-0 text-gray-400">{{ formatTraceOffset(message, event.at) }}</span>
                         <span>{{ event.label }}</span>
+                      </div>
+                    </div>
+                    <div v-if="publicThinkingSteps(message).length" class="space-y-1.5 rounded-xl bg-white/70 p-2 ring-1 ring-gray-100 dark:bg-dark-800/70 dark:ring-dark-700">
+                      <div v-for="step in publicThinkingSteps(message)" :key="step.title" class="grid gap-0.5 sm:grid-cols-[5rem_minmax(0,1fr)] sm:gap-2">
+                        <span class="font-medium text-gray-700 dark:text-dark-100">{{ step.title }}</span>
+                        <span class="leading-5 text-gray-500 dark:text-dark-300">{{ step.detail }}</span>
                       </div>
                     </div>
                     <p v-if="message.reasoning" class="whitespace-pre-wrap break-words leading-5 text-gray-700 dark:text-dark-200">{{ message.reasoning }}</p>
@@ -223,7 +243,22 @@ import AiModeTabs, { type AiCreationMode } from '@/components/ai/AiModeTabs.vue'
 import { adminAPI } from '@/api/admin'
 import { keysAPI, userChannelsAPI } from '@/api'
 import { extractChatModelsForGroup, fallbackChatModels, sendChatCompletion, type AiChatMessage, type AiChatRole, type AiChatCompletionRequest, type AiChatToolCall } from '@/api/aiChat'
+import { deleteImageProject, listImageProjects, type ImageWorkspaceProjectSummary } from '@/api/imageGeneration'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import {
+  aiChatSettingsStorageKey,
+  chatConversationRecord,
+  imageProjectRecord,
+  readStoredChatConversations,
+  readStoredChatSelection,
+  readStoredImageProjectSelection,
+  sortAiCreationRecords,
+  writeStoredChatConversations,
+  writeStoredChatSelection,
+  writeStoredImageProjectSelection,
+  type AiCreationSidebarRecord,
+  type StoredAiChatConversation,
+} from '@/utils/aiCreationRecords'
 import type { AdminGroup, ApiKey, Group, SelectOption } from '@/types'
 import type { UserAvailableChannel } from '@/api/channels'
 
@@ -241,6 +276,9 @@ interface ChatMessage extends AiChatMessage {
   modelName?: string
   groupName?: string
   keyName?: string
+  inputPreview?: string
+  contextMessageCount?: number
+  traceCollapsed?: boolean
   startedAt?: number
   firstReasoningAt?: number
   firstContentAt?: number
@@ -254,24 +292,19 @@ interface ChatTraceEvent {
   at: number
 }
 
-interface ChatConversation {
-  id: string
+interface PublicThinkingStep {
   title: string
-  messages: ChatMessage[]
-  groupId: number | null
-  keyName: string
-  model: string
-  createdAt: number
-  updatedAt: number
+  detail: string
 }
+
+interface ChatConversation extends StoredAiChatConversation<ChatMessage> {}
 
 const props = withDefaults(defineProps<{ scope: WorkspaceScope; activeMode?: AiCreationMode }>(), {
   activeMode: 'dialogue',
 })
 const emit = defineEmits<{ 'mode-change': [value: AiCreationMode] }>()
 
-const storageKey = `sub2api:ai-chat:${props.scope}:v1`
-const settingsStorageKey = `sub2api:ai-chat:${props.scope}:settings:v1`
+const settingsStorageKey = aiChatSettingsStorageKey(props.scope)
 const storedSettings = readStoredSettings()
 const isAdmin = computed(() => props.scope === 'admin')
 
@@ -281,6 +314,7 @@ const adminGroups = ref<AdminGroup[]>([])
 const userGroups = ref<Group[]>([])
 const activeKeys = ref<ApiKey[]>([])
 const channels = ref<UserAvailableChannel[]>([])
+const imageProjects = ref<ImageWorkspaceProjectSummary[]>([])
 const selectedGroupId = ref<string | number | boolean | null>(null)
 const selectedKeyValue = ref<string | number | boolean | null>(null)
 const model = ref<string | number | boolean | null>(null)
@@ -288,10 +322,11 @@ const thinkingEnabled = ref(storedSettings.thinkingEnabled)
 const webSearchEnabled = ref(storedSettings.webSearchEnabled)
 const prompt = ref('')
 const activeConversationId = ref<string | null>(null)
-const conversations = ref<ChatConversation[]>(readStoredConversations())
+const conversations = ref<ChatConversation[]>(readStoredChatConversations<ChatMessage>(props.scope))
 const messagesEl = ref<HTMLElement | null>(null)
 const promptEl = ref<HTMLTextAreaElement | null>(null)
 const traceClock = ref(Date.now())
+const deletingRecordId = ref('')
 let controller: AbortController | null = null
 let traceTimer: ReturnType<typeof setInterval> | null = null
 
@@ -322,6 +357,10 @@ const currentModels = computed(() => {
   return extractChatModelsForGroup(channels.value, group.id, group.platform)
 })
 const sortedConversations = computed(() => [...conversations.value].sort((a, b) => b.updatedAt - a.updatedAt))
+const sidebarRecords = computed(() => sortAiCreationRecords([
+  ...conversations.value.map(chatConversationRecord),
+  ...imageProjects.value.map(imageProjectRecord),
+]))
 const activeConversation = computed(() => conversations.value.find((item) => item.id === activeConversationId.value) || null)
 const messages = computed(() => activeConversation.value?.messages || [])
 const trimmedPrompt = computed(() => prompt.value.trim())
@@ -360,7 +399,7 @@ watch(currentModels, (items) => {
 }, { immediate: true })
 
 watch(conversations, () => {
-  localStorage.setItem(storageKey, JSON.stringify(conversations.value.slice(0, 50)))
+  writeStoredChatConversations(props.scope, conversations.value)
 }, { deep: true })
 
 watch([thinkingEnabled, webSearchEnabled], () => {
@@ -404,11 +443,21 @@ async function loadData() {
       activeKeys.value = keys.items.filter((key) => key.status === 'active' && !!key.group_id)
       userGroups.value = collectUserGroups(channelList, activeKeys.value)
     }
-    if (!activeConversationId.value && conversations.value[0]) {
-      activeConversationId.value = sortedConversations.value[0]?.id || null
-    }
+    await loadImageProjects()
+    restoreSelectedConversation()
   } finally {
     loading.value = false
+  }
+}
+
+async function loadImageProjects() {
+  try {
+    const result = isAdmin.value
+      ? await adminAPI.images.list({ page: 1, page_size: 50 })
+      : await listImageProjects({ page: 1, page_size: 50 })
+    imageProjects.value = result.items
+  } catch {
+    imageProjects.value = []
   }
 }
 
@@ -423,8 +472,9 @@ async function send() {
   assistantMessage.modelName = String(model.value)
   assistantMessage.groupName = selectedGroup.value?.name || ''
   assistantMessage.keyName = apiKeyOptionLabel(selectedKey.value)
+  assistantMessage.inputPreview = text
   assistantMessage.startedAt = Date.now()
-  assistantMessage.traceEvents = [{ label: '发送请求', at: assistantMessage.startedAt }]
+  assistantMessage.traceEvents = [{ label: '理解问题', at: assistantMessage.startedAt }]
   conversation.messages.push(userMessage, assistantMessage)
   conversation.groupId = Number(selectedGroupId.value) || null
   conversation.keyName = apiKeyOptionLabel(selectedKey.value)
@@ -440,6 +490,11 @@ async function send() {
     const history = conversation.messages
       .filter((message) => message.id !== assistantMessage.id && !message.pending && !message.error)
       .map((message): AiChatMessage => ({ role: message.role, content: message.content }))
+    assistantMessage.contextMessageCount = history.length
+    addTraceEvent(assistantMessage, `整理上下文（${history.length} 条消息）`)
+    if (thinkingEnabled.value) addTraceEvent(assistantMessage, '启用深度思考')
+    if (webSearchEnabled.value) addTraceEvent(assistantMessage, '准备联网搜索')
+    addTraceEvent(assistantMessage, '发送请求')
 
     const payload: AiChatCompletionRequest = {
       model: String(model.value),
@@ -461,7 +516,7 @@ async function send() {
       onThoughtDelta: (delta) => {
         if (!assistantMessage.firstReasoningAt) {
           assistantMessage.firstReasoningAt = Date.now()
-          addTraceEvent(assistantMessage, '收到推理摘要')
+          addTraceEvent(assistantMessage, '收到可展示推理摘要')
         }
         assistantMessage.reasoning = `${assistantMessage.reasoning || ''}${delta}`
         touchConversation(conversation)
@@ -505,17 +560,64 @@ function stop() {
 
 function startNewChat() {
   activeConversationId.value = null
+  writeStoredChatSelection(props.scope, null)
   prompt.value = ''
   void nextTick(() => promptEl.value?.focus())
 }
 
 function selectConversation(id: string) {
   activeConversationId.value = id
+  writeStoredChatSelection(props.scope, id)
+}
+
+function selectSidebarRecord(record: AiCreationSidebarRecord) {
+  if (record.mode === 'image' && record.projectId) {
+    writeStoredImageProjectSelection(props.scope, record.projectId)
+    emit('mode-change', 'image')
+    return
+  }
+  if (record.conversationId) selectConversation(record.conversationId)
+}
+
+function canDeleteSidebarRecord(record: AiCreationSidebarRecord) {
+  return (record.mode === 'dialogue' && !!record.conversationId) || (record.mode === 'image' && !!record.projectId)
+}
+
+function deleteSidebarRecordTitle(record: AiCreationSidebarRecord) {
+  return record.mode === 'image' ? '删除作画记录' : '删除对话'
+}
+
+async function deleteSidebarRecord(record: AiCreationSidebarRecord) {
+  if (record.mode === 'dialogue' && record.conversationId) {
+    deleteConversation(record.conversationId)
+    return
+  }
+  if (record.mode === 'image' && record.projectId) {
+    await deleteImageProjectRecord(record.projectId, record.id)
+  }
 }
 
 function deleteConversation(id: string) {
   conversations.value = conversations.value.filter((item) => item.id !== id)
   if (activeConversationId.value === id) activeConversationId.value = sortedConversations.value[0]?.id || null
+  writeStoredChatSelection(props.scope, activeConversationId.value)
+}
+
+async function deleteImageProjectRecord(projectId: number, recordId: string) {
+  if (deletingRecordId.value) return
+  deletingRecordId.value = recordId
+  try {
+    if (isAdmin.value) await adminAPI.images.delete(projectId)
+    else await deleteImageProject(projectId)
+    imageProjects.value = imageProjects.value.filter((project) => project.id !== projectId)
+    if (readStoredImageProjectSelection(props.scope) === projectId) {
+      writeStoredImageProjectSelection(props.scope, imageProjects.value[0]?.id || null)
+    }
+  } catch (err: unknown) {
+    console.error(readErrorText(err))
+  } finally {
+    deletingRecordId.value = ''
+  }
 }
 
 function ensureConversation(seed: string): ChatConversation {
@@ -532,6 +634,7 @@ function ensureConversation(seed: string): ChatConversation {
   }
   conversations.value.unshift(conversation)
   activeConversationId.value = conversation.id
+  writeStoredChatSelection(props.scope, conversation.id)
   return conversation
 }
 
@@ -552,9 +655,47 @@ function hasTrace(message: ChatMessage) {
 
 function traceStatus(message: ChatMessage) {
   if (message.pending) return '生成中'
-  if (message.reasoning) return '已收到推理摘要'
+  if (message.reasoning) return '已收到可展示推理摘要'
   if (message.searchEnabled || searchToolCalls(message).length > 0) return '已请求联网搜索'
+  if (message.thinkingEnabled) return '可解释摘要'
   return '基础过程'
+}
+
+function isTraceCollapsed(message: ChatMessage) {
+  return !!message.traceCollapsed
+}
+
+function toggleTrace(message: ChatMessage) {
+  message.traceCollapsed = !isTraceCollapsed(message)
+}
+
+function publicThinkingSteps(message: ChatMessage): PublicThinkingStep[] {
+  if (message.role !== 'assistant' || message.error) return []
+  const promptText = compactText(message.inputPreview || previousUserPrompt(message), 48)
+  const contextCount = message.contextMessageCount || inferredContextCount(message)
+  const hasSearch = message.searchEnabled || searchToolCalls(message).length > 0
+  const steps: PublicThinkingStep[] = [
+    {
+      title: '理解需求',
+      detail: promptText ? `围绕「${promptText}」确定回答目标。` : '围绕用户最新消息确定回答目标。',
+    },
+    {
+      title: '整理上下文',
+      detail: contextCount > 1 ? `结合本轮和前文共 ${contextCount} 条消息。` : '使用本轮消息作为主要上下文。',
+    },
+    {
+      title: hasSearch ? '检索判断' : '选择路径',
+      detail: hasSearch ? '按开关和工具返回判断是否需要联网信息。' : '未启用联网搜索时，使用当前对话上下文直接组织回答。',
+    },
+    {
+      title: '形成回答',
+      detail: message.reasoning ? '上游返回了可展示推理摘要，下面保留该摘要内容。' : '将可用信息整理成直接可读的最终回复。',
+    },
+  ]
+  if (message.pending) {
+    steps.push({ title: '输出状态', detail: message.firstContentAt ? '已经开始流式输出。' : '正在等待模型返回首段输出。' })
+  }
+  return steps
 }
 
 function thinkingDurationMs(message: ChatMessage) {
@@ -574,6 +715,25 @@ function formatDuration(ms: number) {
 
 function formatTraceOffset(message: ChatMessage, at: number) {
   return `+${formatDuration(Math.max(0, at - (message.startedAt || at)))}`
+}
+
+function previousUserPrompt(message: ChatMessage) {
+  const index = messages.value.findIndex((item) => item.id === message.id)
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const item = messages.value[i]
+    if (item.role === 'user' && item.content.trim()) return item.content
+  }
+  return ''
+}
+
+function inferredContextCount(message: ChatMessage) {
+  const index = messages.value.findIndex((item) => item.id === message.id)
+  return index > 0 ? index : 1
+}
+
+function compactText(value: string, maxLength: number) {
+  const oneLine = value.replace(/\s+/g, ' ').trim()
+  return oneLine.length > maxLength ? `${oneLine.slice(0, maxLength)}...` : oneLine
 }
 
 function addTraceEvent(message: ChatMessage, label: string) {
@@ -630,6 +790,21 @@ function touchConversation(conversation: ChatConversation) {
   }
 }
 
+function isSidebarRecordActive(record: AiCreationSidebarRecord) {
+  return record.mode === 'dialogue' && record.conversationId === activeConversationId.value
+}
+
+function restoreSelectedConversation() {
+  if (activeConversationId.value && conversations.value.some((item) => item.id === activeConversationId.value)) return
+  const storedChatId = readStoredChatSelection(props.scope)
+  if (storedChatId && conversations.value.some((item) => item.id === storedChatId)) {
+    activeConversationId.value = storedChatId
+    return
+  }
+  const hasSelectedImage = readStoredImageProjectSelection(props.scope)
+  activeConversationId.value = hasSelectedImage ? null : sortedConversations.value[0]?.id || null
+}
+
 function collectUserGroups(channelList: UserAvailableChannel[], keys: ApiKey[]): Group[] {
   const groups = new Map<number, Group>()
   for (const key of keys) {
@@ -676,15 +851,6 @@ function preferredGroupId(groups: ChatGroup[]) {
   const firstKeyGroup = activeKeys.value.find((key) => key.status === 'active' && key.group_id)?.group_id
   if (firstKeyGroup && groups.some((group) => group.id === firstKeyGroup)) return firstKeyGroup
   return groups[0]?.id || null
-}
-
-function readStoredConversations(): ChatConversation[] {
-  try {
-    const value = JSON.parse(localStorage.getItem(storageKey) || '[]') as ChatConversation[]
-    return Array.isArray(value) ? value.filter((item) => item.id && Array.isArray(item.messages)) : []
-  } catch {
-    return []
-  }
 }
 
 function readStoredSettings() {

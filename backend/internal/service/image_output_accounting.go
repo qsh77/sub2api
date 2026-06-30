@@ -15,6 +15,7 @@ type openAIImageOutputCounter struct {
 	dataSizes    []string
 	count        int
 	maxDataCount int
+	usageCount   int
 }
 
 func newOpenAIImageOutputCounter() *openAIImageOutputCounter {
@@ -30,6 +31,9 @@ func (c *openAIImageOutputCounter) Count() int {
 	}
 	if c.maxDataCount > c.count {
 		return c.maxDataCount
+	}
+	if c.usageCount > c.count {
+		return c.usageCount
 	}
 	return c.count
 }
@@ -57,9 +61,12 @@ func (c *openAIImageOutputCounter) AddJSONResponse(body []byte) {
 	if c == nil || len(body) == 0 || !gjson.ValidBytes(body) {
 		return
 	}
-	c.addDataArray(gjson.GetBytes(body, "data"))
-	c.addOutputArray(gjson.GetBytes(body, "output"))
-	c.addOutputArray(gjson.GetBytes(body, "response.output"))
+	root := gjson.ParseBytes(body)
+	c.addDataArray(root.Get("data"))
+	c.addOutputArray(root.Get("output"))
+	c.addOutputArray(root.Get("response.output"))
+	c.addUsageImageCount(root)
+	c.addUsageImageCount(root.Get("response"))
 }
 
 func (c *openAIImageOutputCounter) AddSSEData(data []byte) {
@@ -68,6 +75,8 @@ func (c *openAIImageOutputCounter) AddSSEData(data []byte) {
 	}
 	root := gjson.ParseBytes(data)
 	c.addDataArray(root.Get("data"))
+	c.addUsageImageCount(root)
+	c.addUsageImageCount(root.Get("response"))
 	eventType := strings.TrimSpace(root.Get("type").String())
 	switch eventType {
 	case "response.output_item.done":
@@ -84,6 +93,18 @@ func (c *openAIImageOutputCounter) AddSSEData(data []byte) {
 			return
 		}
 		c.addImageOutputItem(root)
+	}
+}
+
+func (c *openAIImageOutputCounter) addUsageImageCount(root gjson.Result) {
+	if c == nil || !root.Exists() || !root.IsObject() {
+		return
+	}
+	for _, path := range []string{"usage.images", "tool_usage.image_gen.images"} {
+		count := int(root.Get(path).Int())
+		if count > c.usageCount {
+			c.usageCount = count
+		}
 	}
 }
 

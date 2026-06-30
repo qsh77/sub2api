@@ -19,8 +19,13 @@ import (
 func swapMonitorHTTPClient(t *testing.T) {
 	t.Helper()
 	orig := monitorHTTPClient
+	origImage := monitorImageHTTPClient
 	monitorHTTPClient = &http.Client{Timeout: 5 * time.Second}
-	t.Cleanup(func() { monitorHTTPClient = orig })
+	monitorImageHTTPClient = &http.Client{Timeout: 5 * time.Second}
+	t.Cleanup(func() {
+		monitorHTTPClient = orig
+		monitorImageHTTPClient = origImage
+	})
 }
 
 // captureHandler 把每次收到的请求 body 和 headers 存起来，测试断言用。
@@ -66,6 +71,8 @@ type openAICaptureHandler struct {
 	status                    int
 	responsesLeadingReasoning bool
 	responsesImageOutput      bool
+	responsesBody             map[string]any
+	imagesBody                map[string]any
 }
 
 func (h *openAICaptureHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +90,23 @@ func (h *openAICaptureHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(h.status)
 
 	answer := answerFromOpenAIRequest(parsed)
+	if h.lastPath == providerOpenAIImagesPath {
+		if h.imagesBody != nil {
+			_ = json.NewEncoder(w).Encode(h.imagesBody)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{
+				{"b64_json": "aGVsbG8=", "size": "1024x1024", "revised_prompt": "health check image"},
+			},
+		})
+		return
+	}
 	if h.lastPath == providerOpenAIResponsesPath {
+		if h.responsesBody != nil {
+			_ = json.NewEncoder(w).Encode(h.responsesBody)
+			return
+		}
 		if h.responsesImageOutput {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"output": []map[string]any{
@@ -258,37 +281,160 @@ func TestRunCheckForModel_OpenAIResponses_SkipsLeadingReasoningItem(t *testing.T
 	}
 }
 
-func TestRunCheckForModel_OpenAIResponsesImageModelUsesImageTool(t *testing.T) {
-	h := &openAICaptureHandler{responsesImageOutput: true}
+func TestRunCheckForModel_OpenAIImageModelUsesImagesAPI(t *testing.T) {
+	h := &openAICaptureHandler{}
 	endpoint := setupFakeOpenAI(t, h)
 
 	res := runCheckForModel(context.Background(), MonitorProviderOpenAI, endpoint, "sk-openai", "gpt-image-2", nil)
 
 	if res.Status != MonitorStatusOperational {
-		t.Fatalf("responses image request should pass when an image is returned, got status=%s message=%q", res.Status, res.Message)
+		t.Fatalf("images request should pass when an image is returned, got status=%s message=%q", res.Status, res.Message)
 	}
-	if h.lastPath != providerOpenAIResponsesPath {
-		t.Fatalf("expected responses path %q, got %q", providerOpenAIResponsesPath, h.lastPath)
+	if h.lastPath != providerOpenAIImagesPath {
+		t.Fatalf("expected images path %q, got %q", providerOpenAIImagesPath, h.lastPath)
 	}
-	if h.lastBody["model"] != openAIImagesResponsesMainModel {
-		t.Errorf("image monitor body should use responses-capable model %q, got %v", openAIImagesResponsesMainModel, h.lastBody["model"])
+	if h.lastBody["model"] != "gpt-image-2" {
+		t.Errorf("image monitor body should contain model=gpt-image-2, got %v", h.lastBody["model"])
 	}
-	tools, ok := h.lastBody["tools"].([]any)
-	if !ok || len(tools) != 1 {
-		t.Fatalf("expected one image_generation tool, got %#v", h.lastBody["tools"])
+	if h.lastBody["prompt"] != monitorOpenAIImagePrompt {
+		t.Errorf("image monitor body should contain health-check prompt, got %v", h.lastBody["prompt"])
 	}
-	tool, ok := tools[0].(map[string]any)
-	if !ok {
-		t.Fatalf("expected image_generation tool object, got %#v", tools[0])
+	if h.lastBody["response_format"] != "b64_json" {
+		t.Errorf("image monitor body should request b64_json, got %v", h.lastBody["response_format"])
 	}
-	if tool["type"] != "image_generation" {
-		t.Errorf("expected image_generation tool type, got %v", tool["type"])
+	if n, ok := h.lastBody["n"].(float64); !ok || n != 1 {
+		t.Errorf("image monitor body should request n=1, got %v", h.lastBody["n"])
 	}
-	if tool["model"] != "gpt-image-2" {
-		t.Errorf("expected image tool model gpt-image-2, got %v", tool["model"])
+	if h.lastBody["stream"] != true {
+		t.Errorf("image monitor body should request streaming output, got %v", h.lastBody["stream"])
 	}
-	if choice, ok := h.lastBody["tool_choice"].(map[string]any); !ok || choice["type"] != "image_generation" {
-		t.Errorf("expected image_generation tool_choice, got %#v", h.lastBody["tool_choice"])
+	if h.lastHeaders.Get("Accept") != "text/event-stream" {
+		t.Errorf("image monitor should accept event stream, got %q", h.lastHeaders.Get("Accept"))
+	}
+	if _, ok := h.lastBody["tools"]; ok {
+		t.Error("images monitor body must not contain Responses image tools")
+	}
+	if _, ok := h.lastBody["instructions"]; ok {
+		t.Error("images monitor body must not contain Responses instructions")
+	}
+}
+
+func TestRunCheckForModel_OpenAIImageModelRetriesWithoutStreamWhenUnsupported(t *testing.T) {
+	swapMonitorHTTPClient(t)
+	var bodies []map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() { _ = r.Body.Close() }()
+		var parsed map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&parsed)
+		bodies = append(bodies, parsed)
+
+		w.Header().Set("Content-Type", "application/json")
+		if parsed["stream"] == true {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{"message": "stream is unsupported"},
+			})
+			return
+		}
+
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{{"b64_json": "aGVsbG8=", "size": "1024x1024"}},
+		})
+	}))
+	t.Cleanup(srv.Close)
+
+	res := runCheckForModel(context.Background(), MonitorProviderOpenAI, srv.URL, "sk-openai", "gpt-image-2", nil)
+
+	if res.Status != MonitorStatusOperational {
+		t.Fatalf("images request should retry without stream when unsupported, got status=%s message=%q", res.Status, res.Message)
+	}
+	if len(bodies) != 2 {
+		t.Fatalf("expected stream request plus non-stream retry, got %d requests", len(bodies))
+	}
+	if bodies[0]["stream"] != true {
+		t.Errorf("first image request should use stream=true, got %v", bodies[0]["stream"])
+	}
+	if _, ok := bodies[1]["stream"]; ok {
+		t.Errorf("retry image request should omit stream, got %v", bodies[1]["stream"])
+	}
+}
+
+func TestRunCheckForModel_OpenAIImageModelAcceptsImagesDataShape(t *testing.T) {
+	h := &openAICaptureHandler{
+		imagesBody: map[string]any{
+			"data": []map[string]any{
+				{"url": "https://example.com/generated.png", "size": "1024x1024"},
+			},
+		},
+	}
+	endpoint := setupFakeOpenAI(t, h)
+
+	res := runCheckForModel(context.Background(), MonitorProviderOpenAI, endpoint, "sk-openai", "gpt-image-2", nil)
+
+	if res.Status != MonitorStatusOperational {
+		t.Fatalf("image request should accept images API data shape, got status=%s message=%q", res.Status, res.Message)
+	}
+}
+
+func TestRunCheckForModel_OpenAIImageModelAcceptsLargeB64Response(t *testing.T) {
+	h := &openAICaptureHandler{
+		imagesBody: map[string]any{
+			"data": []map[string]any{
+				{"b64_json": strings.Repeat("a", monitorResponseMaxBytes+1024), "size": "1024x1024"},
+			},
+		},
+	}
+	endpoint := setupFakeOpenAI(t, h)
+
+	res := runCheckForModel(context.Background(), MonitorProviderOpenAI, endpoint, "sk-openai", "gpt-image-2", nil)
+
+	if res.Status != MonitorStatusOperational {
+		t.Fatalf("image request should accept b64_json larger than default text response limit, got status=%s message=%q", res.Status, res.Message)
+	}
+}
+
+func TestRunCheckForModel_OpenAIImageModelAcceptsUsageImageCount(t *testing.T) {
+	h := &openAICaptureHandler{
+		imagesBody: map[string]any{
+			"output": []map[string]any{},
+			"tool_usage": map[string]any{
+				"image_gen": map[string]any{"images": 1},
+			},
+		},
+	}
+	endpoint := setupFakeOpenAI(t, h)
+
+	res := runCheckForModel(context.Background(), MonitorProviderOpenAI, endpoint, "sk-openai", "gpt-image-2", nil)
+
+	if res.Status != MonitorStatusOperational {
+		t.Fatalf("image request should accept tool_usage image count, got status=%s message=%q", res.Status, res.Message)
+	}
+}
+
+func TestRunCheckForModel_OpenAIImageModelFailsWithoutImageOutput(t *testing.T) {
+	h := &openAICaptureHandler{
+		imagesBody: map[string]any{
+			"output": []map[string]any{
+				{
+					"type":   "message",
+					"status": "completed",
+					"role":   "assistant",
+					"content": []map[string]any{
+						{"type": "output_text", "text": "ok"},
+					},
+				},
+			},
+		},
+	}
+	endpoint := setupFakeOpenAI(t, h)
+
+	res := runCheckForModel(context.Background(), MonitorProviderOpenAI, endpoint, "sk-openai", "gpt-image-2", nil)
+
+	if res.Status != MonitorStatusFailed {
+		t.Fatalf("image request without image output should fail, got status=%s message=%q", res.Status, res.Message)
+	}
+	if !strings.Contains(res.Message, "without image output") {
+		t.Errorf("expected image output failure message, got %q", res.Message)
 	}
 }
 

@@ -263,6 +263,23 @@ describe('API Client', () => {
         })
       )
     })
+
+    it('请求超时返回 timeout 错误', async () => {
+      const adapter = vi.fn().mockRejectedValue({
+        code: 'ECONNABORTED',
+        message: 'timeout of 30000ms exceeded',
+        config: { url: '/test' },
+      })
+      apiClient.defaults.adapter = adapter
+
+      await expect(apiClient.get('/test')).rejects.toEqual(
+        expect.objectContaining({
+          status: 0,
+          code: 'ECONNABORTED',
+          message: 'Request timeout',
+        })
+      )
+    })
   })
 
   // --- 请求取消 ---
