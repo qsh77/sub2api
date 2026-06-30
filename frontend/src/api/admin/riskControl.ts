@@ -39,6 +39,7 @@ export interface ContentModerationConfig {
   blocked_keywords: string[]
   keyword_blocking_mode: KeywordBlockingMode
   model_filter: ContentModerationModelFilter
+  cyber_policy_exclude_from_ban_count: boolean
 }
 
 export type ContentModerationAPIKeyStatusValue = 'unknown' | 'ok' | 'error' | 'frozen'
@@ -113,6 +114,7 @@ export interface UpdateContentModerationConfig {
   blocked_keywords?: string[]
   keyword_blocking_mode?: KeywordBlockingMode
   model_filter?: ContentModerationModelFilter
+  cyber_policy_exclude_from_ban_count?: boolean
 }
 
 export interface ContentModerationRuntimeStatus {
@@ -178,6 +180,7 @@ export interface ContentModerationLog {
   flagged: boolean
   highest_category: string
   highest_score: number
+  matched_keyword: string
   category_scores: Record<string, number>
   threshold_snapshot: Record<string, number>
   input_excerpt: string

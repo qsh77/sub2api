@@ -11,7 +11,11 @@
 *.md
 !deploy/DOCKER.md
 docs/
+# admin-compliance gate (LegalDocumentView.vue) build-time imports
+# docs/legal/*.md?raw into the frontend bundle; keep that subtree in the
+# Docker build context even though docs/ is otherwise excluded.
 !docs/legal/
+!docs/legal/*.md
 
 # IDE
 .idea/
@@ -22,8 +26,6 @@ docs/
 # OS files
 .DS_Store
 Thumbs.db
-._*
-**/._*
 
 # Build artifacts
 dist/
@@ -54,10 +56,6 @@ config.local.yaml
 # Logs
 *.log
 logs/
-data/
-redis_data/
-postgres_data/
-migration/
 
 # Temporary files
 tmp/

@@ -12,7 +12,6 @@ ARG ALPINE_IMAGE=alpine:3.21
 ARG POSTGRES_IMAGE=postgres:18-alpine
 ARG GOPROXY=https://goproxy.cn,direct
 ARG GOSUMDB=sum.golang.google.cn
-ARG APK_REPOSITORY=https://dl-cdn.alpinelinux.org/alpine
 
 # -----------------------------------------------------------------------------
 # Stage 1: Frontend Builder
@@ -21,9 +20,6 @@ FROM ${NODE_IMAGE} AS frontend-builder
 
 WORKDIR /app/frontend
 
-# vue-tsc needs more heap on small VPS builders.
-ENV NODE_OPTIONS=--max-old-space-size=3072
-
 # Install pnpm (pinned to v9 to match CI and keep builds reproducible)
 RUN corepack enable && corepack prepare pnpm@9 --activate
 
@@ -31,10 +27,13 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-# Copy frontend source and build
+# Copy frontend source and build.
+# LegalDocumentView.vue (admin-compliance gate) build-time imports
+# ../../../../docs/legal/*.md?raw, so docs/legal/ must sit beside frontend/
+# in the image (WORKDIR /app/frontend -> resolves to /app/docs/legal/*.md).
+# Copy only that subtree to keep the build dependency minimal.
 COPY frontend/ ./
-# Copy docs for legal compliance pages referenced by frontend
-COPY docs/ /app/docs/
+COPY docs/legal/ /app/docs/legal/
 RUN pnpm run build
 
 # -----------------------------------------------------------------------------
@@ -45,18 +44,15 @@ FROM ${GOLANG_IMAGE} AS backend-builder
 # Build arguments for version info (set by CI)
 ARG VERSION=
 ARG COMMIT=docker
-ARG BUILD_TYPE=source
 ARG DATE
 ARG GOPROXY
 ARG GOSUMDB
-ARG APK_REPOSITORY
 
 ENV GOPROXY=${GOPROXY}
 ENV GOSUMDB=${GOSUMDB}
 
 # Install build dependencies
-RUN sed -i "s#https://dl-cdn.alpinelinux.org/alpine#${APK_REPOSITORY}#g" /etc/apk/repositories && \
-    apk add --no-cache git ca-certificates tzdata
+RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /app/backend
 
@@ -77,7 +73,7 @@ RUN VERSION_VALUE="${VERSION}" && \
     DATE_VALUE="${DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
     CGO_ENABLED=0 GOOS=linux go build \
     -tags embed \
-    -ldflags="-s -w -X main.Version=${VERSION_VALUE} -X main.Commit=${COMMIT} -X main.Date=${DATE_VALUE} -X main.BuildType=${BUILD_TYPE}" \
+    -ldflags="-s -w -X main.Version=${VERSION_VALUE} -X main.Commit=${COMMIT} -X main.Date=${DATE_VALUE} -X main.BuildType=release" \
     -trimpath \
     -o /app/sub2api \
     ./cmd/server
@@ -92,16 +88,13 @@ FROM ${POSTGRES_IMAGE} AS pg-client
 # -----------------------------------------------------------------------------
 FROM ${ALPINE_IMAGE}
 
-ARG APK_REPOSITORY
-
 # Labels
 LABEL maintainer="Wei-Shaw <github.com/Wei-Shaw>"
 LABEL description="Sub2API - AI API Gateway Platform"
 LABEL org.opencontainers.image.source="https://github.com/Wei-Shaw/sub2api"
 
 # Install runtime dependencies
-RUN sed -i "s#https://dl-cdn.alpinelinux.org/alpine#${APK_REPOSITORY}#g" /etc/apk/repositories && \
-    apk add --no-cache \
+RUN apk add --no-cache \
     ca-certificates \
     tzdata \
     su-exec \
