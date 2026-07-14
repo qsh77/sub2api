@@ -22,9 +22,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
 	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
-	"github.com/Wei-Shaw/sub2api/ent/batchimageevent"
-	"github.com/Wei-Shaw/sub2api/ent/batchimageitem"
-	"github.com/Wei-Shaw/sub2api/ent/batchimagejob"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitor"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitordailyrollup"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorhistory"
@@ -33,6 +30,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
 	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
+	"github.com/Wei-Shaw/sub2api/ent/imageproject"
+	"github.com/Wei-Shaw/sub2api/ent/imageversion"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
@@ -76,12 +75,6 @@ type Client struct {
 	AuthIdentity *AuthIdentityClient
 	// AuthIdentityChannel is the client for interacting with the AuthIdentityChannel builders.
 	AuthIdentityChannel *AuthIdentityChannelClient
-	// BatchImageEvent is the client for interacting with the BatchImageEvent builders.
-	BatchImageEvent *BatchImageEventClient
-	// BatchImageItem is the client for interacting with the BatchImageItem builders.
-	BatchImageItem *BatchImageItemClient
-	// BatchImageJob is the client for interacting with the BatchImageJob builders.
-	BatchImageJob *BatchImageJobClient
 	// ChannelMonitor is the client for interacting with the ChannelMonitor builders.
 	ChannelMonitor *ChannelMonitorClient
 	// ChannelMonitorDailyRollup is the client for interacting with the ChannelMonitorDailyRollup builders.
@@ -98,6 +91,10 @@ type Client struct {
 	IdempotencyRecord *IdempotencyRecordClient
 	// IdentityAdoptionDecision is the client for interacting with the IdentityAdoptionDecision builders.
 	IdentityAdoptionDecision *IdentityAdoptionDecisionClient
+	// ImageProject is the client for interacting with the ImageProject builders.
+	ImageProject *ImageProjectClient
+	// ImageVersion is the client for interacting with the ImageVersion builders.
+	ImageVersion *ImageVersionClient
 	// PaymentAuditLog is the client for interacting with the PaymentAuditLog builders.
 	PaymentAuditLog *PaymentAuditLogClient
 	// PaymentOrder is the client for interacting with the PaymentOrder builders.
@@ -156,9 +153,6 @@ func (c *Client) init() {
 	c.AnnouncementRead = NewAnnouncementReadClient(c.config)
 	c.AuthIdentity = NewAuthIdentityClient(c.config)
 	c.AuthIdentityChannel = NewAuthIdentityChannelClient(c.config)
-	c.BatchImageEvent = NewBatchImageEventClient(c.config)
-	c.BatchImageItem = NewBatchImageItemClient(c.config)
-	c.BatchImageJob = NewBatchImageJobClient(c.config)
 	c.ChannelMonitor = NewChannelMonitorClient(c.config)
 	c.ChannelMonitorDailyRollup = NewChannelMonitorDailyRollupClient(c.config)
 	c.ChannelMonitorHistory = NewChannelMonitorHistoryClient(c.config)
@@ -167,6 +161,8 @@ func (c *Client) init() {
 	c.Group = NewGroupClient(c.config)
 	c.IdempotencyRecord = NewIdempotencyRecordClient(c.config)
 	c.IdentityAdoptionDecision = NewIdentityAdoptionDecisionClient(c.config)
+	c.ImageProject = NewImageProjectClient(c.config)
+	c.ImageVersion = NewImageVersionClient(c.config)
 	c.PaymentAuditLog = NewPaymentAuditLogClient(c.config)
 	c.PaymentOrder = NewPaymentOrderClient(c.config)
 	c.PaymentProviderInstance = NewPaymentProviderInstanceClient(c.config)
@@ -286,9 +282,6 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		AnnouncementRead:              NewAnnouncementReadClient(cfg),
 		AuthIdentity:                  NewAuthIdentityClient(cfg),
 		AuthIdentityChannel:           NewAuthIdentityChannelClient(cfg),
-		BatchImageEvent:               NewBatchImageEventClient(cfg),
-		BatchImageItem:                NewBatchImageItemClient(cfg),
-		BatchImageJob:                 NewBatchImageJobClient(cfg),
 		ChannelMonitor:                NewChannelMonitorClient(cfg),
 		ChannelMonitorDailyRollup:     NewChannelMonitorDailyRollupClient(cfg),
 		ChannelMonitorHistory:         NewChannelMonitorHistoryClient(cfg),
@@ -297,6 +290,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Group:                         NewGroupClient(cfg),
 		IdempotencyRecord:             NewIdempotencyRecordClient(cfg),
 		IdentityAdoptionDecision:      NewIdentityAdoptionDecisionClient(cfg),
+		ImageProject:                  NewImageProjectClient(cfg),
+		ImageVersion:                  NewImageVersionClient(cfg),
 		PaymentAuditLog:               NewPaymentAuditLogClient(cfg),
 		PaymentOrder:                  NewPaymentOrderClient(cfg),
 		PaymentProviderInstance:       NewPaymentProviderInstanceClient(cfg),
@@ -343,9 +338,6 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		AnnouncementRead:              NewAnnouncementReadClient(cfg),
 		AuthIdentity:                  NewAuthIdentityClient(cfg),
 		AuthIdentityChannel:           NewAuthIdentityChannelClient(cfg),
-		BatchImageEvent:               NewBatchImageEventClient(cfg),
-		BatchImageItem:                NewBatchImageItemClient(cfg),
-		BatchImageJob:                 NewBatchImageJobClient(cfg),
 		ChannelMonitor:                NewChannelMonitorClient(cfg),
 		ChannelMonitorDailyRollup:     NewChannelMonitorDailyRollupClient(cfg),
 		ChannelMonitorHistory:         NewChannelMonitorHistoryClient(cfg),
@@ -354,6 +346,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Group:                         NewGroupClient(cfg),
 		IdempotencyRecord:             NewIdempotencyRecordClient(cfg),
 		IdentityAdoptionDecision:      NewIdentityAdoptionDecisionClient(cfg),
+		ImageProject:                  NewImageProjectClient(cfg),
+		ImageVersion:                  NewImageVersionClient(cfg),
 		PaymentAuditLog:               NewPaymentAuditLogClient(cfg),
 		PaymentOrder:                  NewPaymentOrderClient(cfg),
 		PaymentProviderInstance:       NewPaymentProviderInstanceClient(cfg),
@@ -404,16 +398,16 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
-		c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent, c.BatchImageItem,
-		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
-		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
-		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserPlatformQuota, c.UserSubscription,
+		c.AuthIdentity, c.AuthIdentityChannel, c.ChannelMonitor,
+		c.ChannelMonitorDailyRollup, c.ChannelMonitorHistory,
+		c.ChannelMonitorRequestTemplate, c.ErrorPassthroughRule, c.Group,
+		c.IdempotencyRecord, c.IdentityAdoptionDecision, c.ImageProject,
+		c.ImageVersion, c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
+		c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage, c.Proxy, c.RedeemCode,
+		c.SecuritySecret, c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile,
+		c.UsageCleanupTask, c.UsageLog, c.User, c.UserAllowedGroup,
+		c.UserAttributeDefinition, c.UserAttributeValue, c.UserPlatformQuota,
+		c.UserSubscription,
 	} {
 		n.Use(hooks...)
 	}
@@ -424,16 +418,16 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
-		c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent, c.BatchImageItem,
-		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
-		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
-		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserPlatformQuota, c.UserSubscription,
+		c.AuthIdentity, c.AuthIdentityChannel, c.ChannelMonitor,
+		c.ChannelMonitorDailyRollup, c.ChannelMonitorHistory,
+		c.ChannelMonitorRequestTemplate, c.ErrorPassthroughRule, c.Group,
+		c.IdempotencyRecord, c.IdentityAdoptionDecision, c.ImageProject,
+		c.ImageVersion, c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance,
+		c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage, c.Proxy, c.RedeemCode,
+		c.SecuritySecret, c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile,
+		c.UsageCleanupTask, c.UsageLog, c.User, c.UserAllowedGroup,
+		c.UserAttributeDefinition, c.UserAttributeValue, c.UserPlatformQuota,
+		c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -456,12 +450,6 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.AuthIdentity.mutate(ctx, m)
 	case *AuthIdentityChannelMutation:
 		return c.AuthIdentityChannel.mutate(ctx, m)
-	case *BatchImageEventMutation:
-		return c.BatchImageEvent.mutate(ctx, m)
-	case *BatchImageItemMutation:
-		return c.BatchImageItem.mutate(ctx, m)
-	case *BatchImageJobMutation:
-		return c.BatchImageJob.mutate(ctx, m)
 	case *ChannelMonitorMutation:
 		return c.ChannelMonitor.mutate(ctx, m)
 	case *ChannelMonitorDailyRollupMutation:
@@ -478,6 +466,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.IdempotencyRecord.mutate(ctx, m)
 	case *IdentityAdoptionDecisionMutation:
 		return c.IdentityAdoptionDecision.mutate(ctx, m)
+	case *ImageProjectMutation:
+		return c.ImageProject.mutate(ctx, m)
+	case *ImageVersionMutation:
+		return c.ImageVersion.mutate(ctx, m)
 	case *PaymentAuditLogMutation:
 		return c.PaymentAuditLog.mutate(ctx, m)
 	case *PaymentOrderMutation:
@@ -839,38 +831,6 @@ func (c *AccountClient) QueryProxy(_m *Account) *ProxyQuery {
 			sqlgraph.From(account.Table, account.FieldID, id),
 			sqlgraph.To(proxy.Table, proxy.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, account.ProxyTable, account.ProxyColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryParent queries the parent edge of a Account.
-func (c *AccountClient) QueryParent(_m *Account) *AccountQuery {
-	query := (&AccountClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(account.Table, account.FieldID, id),
-			sqlgraph.To(account.Table, account.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, account.ParentTable, account.ParentColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryChildren queries the children edge of a Account.
-func (c *AccountClient) QueryChildren(_m *Account) *AccountQuery {
-	query := (&AccountClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(account.Table, account.FieldID, id),
-			sqlgraph.To(account.Table, account.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, account.ChildrenTable, account.ChildrenColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -1694,405 +1654,6 @@ func (c *AuthIdentityChannelClient) mutate(ctx context.Context, m *AuthIdentityC
 		return (&AuthIdentityChannelDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown AuthIdentityChannel mutation op: %q", m.Op())
-	}
-}
-
-// BatchImageEventClient is a client for the BatchImageEvent schema.
-type BatchImageEventClient struct {
-	config
-}
-
-// NewBatchImageEventClient returns a client for the BatchImageEvent from the given config.
-func NewBatchImageEventClient(c config) *BatchImageEventClient {
-	return &BatchImageEventClient{config: c}
-}
-
-// Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `batchimageevent.Hooks(f(g(h())))`.
-func (c *BatchImageEventClient) Use(hooks ...Hook) {
-	c.hooks.BatchImageEvent = append(c.hooks.BatchImageEvent, hooks...)
-}
-
-// Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `batchimageevent.Intercept(f(g(h())))`.
-func (c *BatchImageEventClient) Intercept(interceptors ...Interceptor) {
-	c.inters.BatchImageEvent = append(c.inters.BatchImageEvent, interceptors...)
-}
-
-// Create returns a builder for creating a BatchImageEvent entity.
-func (c *BatchImageEventClient) Create() *BatchImageEventCreate {
-	mutation := newBatchImageEventMutation(c.config, OpCreate)
-	return &BatchImageEventCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// CreateBulk returns a builder for creating a bulk of BatchImageEvent entities.
-func (c *BatchImageEventClient) CreateBulk(builders ...*BatchImageEventCreate) *BatchImageEventCreateBulk {
-	return &BatchImageEventCreateBulk{config: c.config, builders: builders}
-}
-
-// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
-// a builder and applies setFunc on it.
-func (c *BatchImageEventClient) MapCreateBulk(slice any, setFunc func(*BatchImageEventCreate, int)) *BatchImageEventCreateBulk {
-	rv := reflect.ValueOf(slice)
-	if rv.Kind() != reflect.Slice {
-		return &BatchImageEventCreateBulk{err: fmt.Errorf("calling to BatchImageEventClient.MapCreateBulk with wrong type %T, need slice", slice)}
-	}
-	builders := make([]*BatchImageEventCreate, rv.Len())
-	for i := 0; i < rv.Len(); i++ {
-		builders[i] = c.Create()
-		setFunc(builders[i], i)
-	}
-	return &BatchImageEventCreateBulk{config: c.config, builders: builders}
-}
-
-// Update returns an update builder for BatchImageEvent.
-func (c *BatchImageEventClient) Update() *BatchImageEventUpdate {
-	mutation := newBatchImageEventMutation(c.config, OpUpdate)
-	return &BatchImageEventUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOne returns an update builder for the given entity.
-func (c *BatchImageEventClient) UpdateOne(_m *BatchImageEvent) *BatchImageEventUpdateOne {
-	mutation := newBatchImageEventMutation(c.config, OpUpdateOne, withBatchImageEvent(_m))
-	return &BatchImageEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOneID returns an update builder for the given id.
-func (c *BatchImageEventClient) UpdateOneID(id int64) *BatchImageEventUpdateOne {
-	mutation := newBatchImageEventMutation(c.config, OpUpdateOne, withBatchImageEventID(id))
-	return &BatchImageEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Delete returns a delete builder for BatchImageEvent.
-func (c *BatchImageEventClient) Delete() *BatchImageEventDelete {
-	mutation := newBatchImageEventMutation(c.config, OpDelete)
-	return &BatchImageEventDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// DeleteOne returns a builder for deleting the given entity.
-func (c *BatchImageEventClient) DeleteOne(_m *BatchImageEvent) *BatchImageEventDeleteOne {
-	return c.DeleteOneID(_m.ID)
-}
-
-// DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *BatchImageEventClient) DeleteOneID(id int64) *BatchImageEventDeleteOne {
-	builder := c.Delete().Where(batchimageevent.ID(id))
-	builder.mutation.id = &id
-	builder.mutation.op = OpDeleteOne
-	return &BatchImageEventDeleteOne{builder}
-}
-
-// Query returns a query builder for BatchImageEvent.
-func (c *BatchImageEventClient) Query() *BatchImageEventQuery {
-	return &BatchImageEventQuery{
-		config: c.config,
-		ctx:    &QueryContext{Type: TypeBatchImageEvent},
-		inters: c.Interceptors(),
-	}
-}
-
-// Get returns a BatchImageEvent entity by its id.
-func (c *BatchImageEventClient) Get(ctx context.Context, id int64) (*BatchImageEvent, error) {
-	return c.Query().Where(batchimageevent.ID(id)).Only(ctx)
-}
-
-// GetX is like Get, but panics if an error occurs.
-func (c *BatchImageEventClient) GetX(ctx context.Context, id int64) *BatchImageEvent {
-	obj, err := c.Get(ctx, id)
-	if err != nil {
-		panic(err)
-	}
-	return obj
-}
-
-// Hooks returns the client hooks.
-func (c *BatchImageEventClient) Hooks() []Hook {
-	return c.hooks.BatchImageEvent
-}
-
-// Interceptors returns the client interceptors.
-func (c *BatchImageEventClient) Interceptors() []Interceptor {
-	return c.inters.BatchImageEvent
-}
-
-func (c *BatchImageEventClient) mutate(ctx context.Context, m *BatchImageEventMutation) (Value, error) {
-	switch m.Op() {
-	case OpCreate:
-		return (&BatchImageEventCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdate:
-		return (&BatchImageEventUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdateOne:
-		return (&BatchImageEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpDelete, OpDeleteOne:
-		return (&BatchImageEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
-	default:
-		return nil, fmt.Errorf("ent: unknown BatchImageEvent mutation op: %q", m.Op())
-	}
-}
-
-// BatchImageItemClient is a client for the BatchImageItem schema.
-type BatchImageItemClient struct {
-	config
-}
-
-// NewBatchImageItemClient returns a client for the BatchImageItem from the given config.
-func NewBatchImageItemClient(c config) *BatchImageItemClient {
-	return &BatchImageItemClient{config: c}
-}
-
-// Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `batchimageitem.Hooks(f(g(h())))`.
-func (c *BatchImageItemClient) Use(hooks ...Hook) {
-	c.hooks.BatchImageItem = append(c.hooks.BatchImageItem, hooks...)
-}
-
-// Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `batchimageitem.Intercept(f(g(h())))`.
-func (c *BatchImageItemClient) Intercept(interceptors ...Interceptor) {
-	c.inters.BatchImageItem = append(c.inters.BatchImageItem, interceptors...)
-}
-
-// Create returns a builder for creating a BatchImageItem entity.
-func (c *BatchImageItemClient) Create() *BatchImageItemCreate {
-	mutation := newBatchImageItemMutation(c.config, OpCreate)
-	return &BatchImageItemCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// CreateBulk returns a builder for creating a bulk of BatchImageItem entities.
-func (c *BatchImageItemClient) CreateBulk(builders ...*BatchImageItemCreate) *BatchImageItemCreateBulk {
-	return &BatchImageItemCreateBulk{config: c.config, builders: builders}
-}
-
-// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
-// a builder and applies setFunc on it.
-func (c *BatchImageItemClient) MapCreateBulk(slice any, setFunc func(*BatchImageItemCreate, int)) *BatchImageItemCreateBulk {
-	rv := reflect.ValueOf(slice)
-	if rv.Kind() != reflect.Slice {
-		return &BatchImageItemCreateBulk{err: fmt.Errorf("calling to BatchImageItemClient.MapCreateBulk with wrong type %T, need slice", slice)}
-	}
-	builders := make([]*BatchImageItemCreate, rv.Len())
-	for i := 0; i < rv.Len(); i++ {
-		builders[i] = c.Create()
-		setFunc(builders[i], i)
-	}
-	return &BatchImageItemCreateBulk{config: c.config, builders: builders}
-}
-
-// Update returns an update builder for BatchImageItem.
-func (c *BatchImageItemClient) Update() *BatchImageItemUpdate {
-	mutation := newBatchImageItemMutation(c.config, OpUpdate)
-	return &BatchImageItemUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOne returns an update builder for the given entity.
-func (c *BatchImageItemClient) UpdateOne(_m *BatchImageItem) *BatchImageItemUpdateOne {
-	mutation := newBatchImageItemMutation(c.config, OpUpdateOne, withBatchImageItem(_m))
-	return &BatchImageItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOneID returns an update builder for the given id.
-func (c *BatchImageItemClient) UpdateOneID(id int64) *BatchImageItemUpdateOne {
-	mutation := newBatchImageItemMutation(c.config, OpUpdateOne, withBatchImageItemID(id))
-	return &BatchImageItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Delete returns a delete builder for BatchImageItem.
-func (c *BatchImageItemClient) Delete() *BatchImageItemDelete {
-	mutation := newBatchImageItemMutation(c.config, OpDelete)
-	return &BatchImageItemDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// DeleteOne returns a builder for deleting the given entity.
-func (c *BatchImageItemClient) DeleteOne(_m *BatchImageItem) *BatchImageItemDeleteOne {
-	return c.DeleteOneID(_m.ID)
-}
-
-// DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *BatchImageItemClient) DeleteOneID(id int64) *BatchImageItemDeleteOne {
-	builder := c.Delete().Where(batchimageitem.ID(id))
-	builder.mutation.id = &id
-	builder.mutation.op = OpDeleteOne
-	return &BatchImageItemDeleteOne{builder}
-}
-
-// Query returns a query builder for BatchImageItem.
-func (c *BatchImageItemClient) Query() *BatchImageItemQuery {
-	return &BatchImageItemQuery{
-		config: c.config,
-		ctx:    &QueryContext{Type: TypeBatchImageItem},
-		inters: c.Interceptors(),
-	}
-}
-
-// Get returns a BatchImageItem entity by its id.
-func (c *BatchImageItemClient) Get(ctx context.Context, id int64) (*BatchImageItem, error) {
-	return c.Query().Where(batchimageitem.ID(id)).Only(ctx)
-}
-
-// GetX is like Get, but panics if an error occurs.
-func (c *BatchImageItemClient) GetX(ctx context.Context, id int64) *BatchImageItem {
-	obj, err := c.Get(ctx, id)
-	if err != nil {
-		panic(err)
-	}
-	return obj
-}
-
-// Hooks returns the client hooks.
-func (c *BatchImageItemClient) Hooks() []Hook {
-	return c.hooks.BatchImageItem
-}
-
-// Interceptors returns the client interceptors.
-func (c *BatchImageItemClient) Interceptors() []Interceptor {
-	return c.inters.BatchImageItem
-}
-
-func (c *BatchImageItemClient) mutate(ctx context.Context, m *BatchImageItemMutation) (Value, error) {
-	switch m.Op() {
-	case OpCreate:
-		return (&BatchImageItemCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdate:
-		return (&BatchImageItemUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdateOne:
-		return (&BatchImageItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpDelete, OpDeleteOne:
-		return (&BatchImageItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
-	default:
-		return nil, fmt.Errorf("ent: unknown BatchImageItem mutation op: %q", m.Op())
-	}
-}
-
-// BatchImageJobClient is a client for the BatchImageJob schema.
-type BatchImageJobClient struct {
-	config
-}
-
-// NewBatchImageJobClient returns a client for the BatchImageJob from the given config.
-func NewBatchImageJobClient(c config) *BatchImageJobClient {
-	return &BatchImageJobClient{config: c}
-}
-
-// Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `batchimagejob.Hooks(f(g(h())))`.
-func (c *BatchImageJobClient) Use(hooks ...Hook) {
-	c.hooks.BatchImageJob = append(c.hooks.BatchImageJob, hooks...)
-}
-
-// Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `batchimagejob.Intercept(f(g(h())))`.
-func (c *BatchImageJobClient) Intercept(interceptors ...Interceptor) {
-	c.inters.BatchImageJob = append(c.inters.BatchImageJob, interceptors...)
-}
-
-// Create returns a builder for creating a BatchImageJob entity.
-func (c *BatchImageJobClient) Create() *BatchImageJobCreate {
-	mutation := newBatchImageJobMutation(c.config, OpCreate)
-	return &BatchImageJobCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// CreateBulk returns a builder for creating a bulk of BatchImageJob entities.
-func (c *BatchImageJobClient) CreateBulk(builders ...*BatchImageJobCreate) *BatchImageJobCreateBulk {
-	return &BatchImageJobCreateBulk{config: c.config, builders: builders}
-}
-
-// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
-// a builder and applies setFunc on it.
-func (c *BatchImageJobClient) MapCreateBulk(slice any, setFunc func(*BatchImageJobCreate, int)) *BatchImageJobCreateBulk {
-	rv := reflect.ValueOf(slice)
-	if rv.Kind() != reflect.Slice {
-		return &BatchImageJobCreateBulk{err: fmt.Errorf("calling to BatchImageJobClient.MapCreateBulk with wrong type %T, need slice", slice)}
-	}
-	builders := make([]*BatchImageJobCreate, rv.Len())
-	for i := 0; i < rv.Len(); i++ {
-		builders[i] = c.Create()
-		setFunc(builders[i], i)
-	}
-	return &BatchImageJobCreateBulk{config: c.config, builders: builders}
-}
-
-// Update returns an update builder for BatchImageJob.
-func (c *BatchImageJobClient) Update() *BatchImageJobUpdate {
-	mutation := newBatchImageJobMutation(c.config, OpUpdate)
-	return &BatchImageJobUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOne returns an update builder for the given entity.
-func (c *BatchImageJobClient) UpdateOne(_m *BatchImageJob) *BatchImageJobUpdateOne {
-	mutation := newBatchImageJobMutation(c.config, OpUpdateOne, withBatchImageJob(_m))
-	return &BatchImageJobUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOneID returns an update builder for the given id.
-func (c *BatchImageJobClient) UpdateOneID(id int64) *BatchImageJobUpdateOne {
-	mutation := newBatchImageJobMutation(c.config, OpUpdateOne, withBatchImageJobID(id))
-	return &BatchImageJobUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Delete returns a delete builder for BatchImageJob.
-func (c *BatchImageJobClient) Delete() *BatchImageJobDelete {
-	mutation := newBatchImageJobMutation(c.config, OpDelete)
-	return &BatchImageJobDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// DeleteOne returns a builder for deleting the given entity.
-func (c *BatchImageJobClient) DeleteOne(_m *BatchImageJob) *BatchImageJobDeleteOne {
-	return c.DeleteOneID(_m.ID)
-}
-
-// DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *BatchImageJobClient) DeleteOneID(id int64) *BatchImageJobDeleteOne {
-	builder := c.Delete().Where(batchimagejob.ID(id))
-	builder.mutation.id = &id
-	builder.mutation.op = OpDeleteOne
-	return &BatchImageJobDeleteOne{builder}
-}
-
-// Query returns a query builder for BatchImageJob.
-func (c *BatchImageJobClient) Query() *BatchImageJobQuery {
-	return &BatchImageJobQuery{
-		config: c.config,
-		ctx:    &QueryContext{Type: TypeBatchImageJob},
-		inters: c.Interceptors(),
-	}
-}
-
-// Get returns a BatchImageJob entity by its id.
-func (c *BatchImageJobClient) Get(ctx context.Context, id int64) (*BatchImageJob, error) {
-	return c.Query().Where(batchimagejob.ID(id)).Only(ctx)
-}
-
-// GetX is like Get, but panics if an error occurs.
-func (c *BatchImageJobClient) GetX(ctx context.Context, id int64) *BatchImageJob {
-	obj, err := c.Get(ctx, id)
-	if err != nil {
-		panic(err)
-	}
-	return obj
-}
-
-// Hooks returns the client hooks.
-func (c *BatchImageJobClient) Hooks() []Hook {
-	return c.hooks.BatchImageJob
-}
-
-// Interceptors returns the client interceptors.
-func (c *BatchImageJobClient) Interceptors() []Interceptor {
-	return c.inters.BatchImageJob
-}
-
-func (c *BatchImageJobClient) mutate(ctx context.Context, m *BatchImageJobMutation) (Value, error) {
-	switch m.Op() {
-	case OpCreate:
-		return (&BatchImageJobCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdate:
-		return (&BatchImageJobUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdateOne:
-		return (&BatchImageJobUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpDelete, OpDeleteOne:
-		return (&BatchImageJobDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
-	default:
-		return nil, fmt.Errorf("ent: unknown BatchImageJob mutation op: %q", m.Op())
 	}
 }
 
@@ -3415,6 +2976,338 @@ func (c *IdentityAdoptionDecisionClient) mutate(ctx context.Context, m *Identity
 		return (&IdentityAdoptionDecisionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown IdentityAdoptionDecision mutation op: %q", m.Op())
+	}
+}
+
+// ImageProjectClient is a client for the ImageProject schema.
+type ImageProjectClient struct {
+	config
+}
+
+// NewImageProjectClient returns a client for the ImageProject from the given config.
+func NewImageProjectClient(c config) *ImageProjectClient {
+	return &ImageProjectClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `imageproject.Hooks(f(g(h())))`.
+func (c *ImageProjectClient) Use(hooks ...Hook) {
+	c.hooks.ImageProject = append(c.hooks.ImageProject, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `imageproject.Intercept(f(g(h())))`.
+func (c *ImageProjectClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ImageProject = append(c.inters.ImageProject, interceptors...)
+}
+
+// Create returns a builder for creating a ImageProject entity.
+func (c *ImageProjectClient) Create() *ImageProjectCreate {
+	mutation := newImageProjectMutation(c.config, OpCreate)
+	return &ImageProjectCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ImageProject entities.
+func (c *ImageProjectClient) CreateBulk(builders ...*ImageProjectCreate) *ImageProjectCreateBulk {
+	return &ImageProjectCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ImageProjectClient) MapCreateBulk(slice any, setFunc func(*ImageProjectCreate, int)) *ImageProjectCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ImageProjectCreateBulk{err: fmt.Errorf("calling to ImageProjectClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ImageProjectCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ImageProjectCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ImageProject.
+func (c *ImageProjectClient) Update() *ImageProjectUpdate {
+	mutation := newImageProjectMutation(c.config, OpUpdate)
+	return &ImageProjectUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ImageProjectClient) UpdateOne(_m *ImageProject) *ImageProjectUpdateOne {
+	mutation := newImageProjectMutation(c.config, OpUpdateOne, withImageProject(_m))
+	return &ImageProjectUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ImageProjectClient) UpdateOneID(id int64) *ImageProjectUpdateOne {
+	mutation := newImageProjectMutation(c.config, OpUpdateOne, withImageProjectID(id))
+	return &ImageProjectUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ImageProject.
+func (c *ImageProjectClient) Delete() *ImageProjectDelete {
+	mutation := newImageProjectMutation(c.config, OpDelete)
+	return &ImageProjectDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ImageProjectClient) DeleteOne(_m *ImageProject) *ImageProjectDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ImageProjectClient) DeleteOneID(id int64) *ImageProjectDeleteOne {
+	builder := c.Delete().Where(imageproject.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ImageProjectDeleteOne{builder}
+}
+
+// Query returns a query builder for ImageProject.
+func (c *ImageProjectClient) Query() *ImageProjectQuery {
+	return &ImageProjectQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeImageProject},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ImageProject entity by its id.
+func (c *ImageProjectClient) Get(ctx context.Context, id int64) (*ImageProject, error) {
+	return c.Query().Where(imageproject.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ImageProjectClient) GetX(ctx context.Context, id int64) *ImageProject {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryUser queries the user edge of a ImageProject.
+func (c *ImageProjectClient) QueryUser(_m *ImageProject) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(imageproject.Table, imageproject.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, imageproject.UserTable, imageproject.UserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryVersions queries the versions edge of a ImageProject.
+func (c *ImageProjectClient) QueryVersions(_m *ImageProject) *ImageVersionQuery {
+	query := (&ImageVersionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(imageproject.Table, imageproject.FieldID, id),
+			sqlgraph.To(imageversion.Table, imageversion.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, imageproject.VersionsTable, imageproject.VersionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ImageProjectClient) Hooks() []Hook {
+	hooks := c.hooks.ImageProject
+	return append(hooks[:len(hooks):len(hooks)], imageproject.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *ImageProjectClient) Interceptors() []Interceptor {
+	inters := c.inters.ImageProject
+	return append(inters[:len(inters):len(inters)], imageproject.Interceptors[:]...)
+}
+
+func (c *ImageProjectClient) mutate(ctx context.Context, m *ImageProjectMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ImageProjectCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ImageProjectUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ImageProjectUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ImageProjectDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ImageProject mutation op: %q", m.Op())
+	}
+}
+
+// ImageVersionClient is a client for the ImageVersion schema.
+type ImageVersionClient struct {
+	config
+}
+
+// NewImageVersionClient returns a client for the ImageVersion from the given config.
+func NewImageVersionClient(c config) *ImageVersionClient {
+	return &ImageVersionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `imageversion.Hooks(f(g(h())))`.
+func (c *ImageVersionClient) Use(hooks ...Hook) {
+	c.hooks.ImageVersion = append(c.hooks.ImageVersion, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `imageversion.Intercept(f(g(h())))`.
+func (c *ImageVersionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ImageVersion = append(c.inters.ImageVersion, interceptors...)
+}
+
+// Create returns a builder for creating a ImageVersion entity.
+func (c *ImageVersionClient) Create() *ImageVersionCreate {
+	mutation := newImageVersionMutation(c.config, OpCreate)
+	return &ImageVersionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ImageVersion entities.
+func (c *ImageVersionClient) CreateBulk(builders ...*ImageVersionCreate) *ImageVersionCreateBulk {
+	return &ImageVersionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ImageVersionClient) MapCreateBulk(slice any, setFunc func(*ImageVersionCreate, int)) *ImageVersionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ImageVersionCreateBulk{err: fmt.Errorf("calling to ImageVersionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ImageVersionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ImageVersionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ImageVersion.
+func (c *ImageVersionClient) Update() *ImageVersionUpdate {
+	mutation := newImageVersionMutation(c.config, OpUpdate)
+	return &ImageVersionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ImageVersionClient) UpdateOne(_m *ImageVersion) *ImageVersionUpdateOne {
+	mutation := newImageVersionMutation(c.config, OpUpdateOne, withImageVersion(_m))
+	return &ImageVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ImageVersionClient) UpdateOneID(id int64) *ImageVersionUpdateOne {
+	mutation := newImageVersionMutation(c.config, OpUpdateOne, withImageVersionID(id))
+	return &ImageVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ImageVersion.
+func (c *ImageVersionClient) Delete() *ImageVersionDelete {
+	mutation := newImageVersionMutation(c.config, OpDelete)
+	return &ImageVersionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ImageVersionClient) DeleteOne(_m *ImageVersion) *ImageVersionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ImageVersionClient) DeleteOneID(id int64) *ImageVersionDeleteOne {
+	builder := c.Delete().Where(imageversion.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ImageVersionDeleteOne{builder}
+}
+
+// Query returns a query builder for ImageVersion.
+func (c *ImageVersionClient) Query() *ImageVersionQuery {
+	return &ImageVersionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeImageVersion},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ImageVersion entity by its id.
+func (c *ImageVersionClient) Get(ctx context.Context, id int64) (*ImageVersion, error) {
+	return c.Query().Where(imageversion.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ImageVersionClient) GetX(ctx context.Context, id int64) *ImageVersion {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryProject queries the project edge of a ImageVersion.
+func (c *ImageVersionClient) QueryProject(_m *ImageVersion) *ImageProjectQuery {
+	query := (&ImageProjectClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(imageversion.Table, imageversion.FieldID, id),
+			sqlgraph.To(imageproject.Table, imageproject.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, imageversion.ProjectTable, imageversion.ProjectColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUser queries the user edge of a ImageVersion.
+func (c *ImageVersionClient) QueryUser(_m *ImageVersion) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(imageversion.Table, imageversion.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, imageversion.UserTable, imageversion.UserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ImageVersionClient) Hooks() []Hook {
+	return c.hooks.ImageVersion
+}
+
+// Interceptors returns the client interceptors.
+func (c *ImageVersionClient) Interceptors() []Interceptor {
+	return c.inters.ImageVersion
+}
+
+func (c *ImageVersionClient) mutate(ctx context.Context, m *ImageVersionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ImageVersionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ImageVersionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ImageVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ImageVersionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ImageVersion mutation op: %q", m.Op())
 	}
 }
 
@@ -5838,6 +5731,38 @@ func (c *UserClient) QueryPlatformQuotas(_m *User) *UserPlatformQuotaQuery {
 	return query
 }
 
+// QueryImageProjects queries the image_projects edge of a User.
+func (c *UserClient) QueryImageProjects(_m *User) *ImageProjectQuery {
+	query := (&ImageProjectClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(imageproject.Table, imageproject.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.ImageProjectsTable, user.ImageProjectsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryImageVersions queries the image_versions edge of a User.
+func (c *UserClient) QueryImageVersions(_m *User) *ImageVersionQuery {
+	query := (&ImageVersionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(imageversion.Table, imageversion.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.ImageVersionsTable, user.ImageVersionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryUserAllowedGroups queries the user_allowed_groups edge of a User.
 func (c *UserClient) QueryUserAllowedGroups(_m *User) *UserAllowedGroupQuery {
 	query := (&UserAllowedGroupClient{config: c.config}).Query()
@@ -6667,25 +6592,25 @@ func (c *UserSubscriptionClient) mutate(ctx context.Context, m *UserSubscription
 type (
 	hooks struct {
 		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
-		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
-		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
-		ChannelMonitorRequestTemplate, ErrorPassthroughRule, Group, IdempotencyRecord,
-		IdentityAdoptionDecision, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PendingAuthSession, PromoCode, PromoCodeUsage, Proxy,
-		RedeemCode, SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
-		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
-		UserAttributeValue, UserPlatformQuota, UserSubscription []ent.Hook
+		AuthIdentityChannel, ChannelMonitor, ChannelMonitorDailyRollup,
+		ChannelMonitorHistory, ChannelMonitorRequestTemplate, ErrorPassthroughRule,
+		Group, IdempotencyRecord, IdentityAdoptionDecision, ImageProject, ImageVersion,
+		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingAuthSession,
+		PromoCode, PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting,
+		SubscriptionPlan, TLSFingerprintProfile, UsageCleanupTask, UsageLog, User,
+		UserAllowedGroup, UserAttributeDefinition, UserAttributeValue,
+		UserPlatformQuota, UserSubscription []ent.Hook
 	}
 	inters struct {
 		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
-		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
-		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
-		ChannelMonitorRequestTemplate, ErrorPassthroughRule, Group, IdempotencyRecord,
-		IdentityAdoptionDecision, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PendingAuthSession, PromoCode, PromoCodeUsage, Proxy,
-		RedeemCode, SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
-		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
-		UserAttributeValue, UserPlatformQuota, UserSubscription []ent.Interceptor
+		AuthIdentityChannel, ChannelMonitor, ChannelMonitorDailyRollup,
+		ChannelMonitorHistory, ChannelMonitorRequestTemplate, ErrorPassthroughRule,
+		Group, IdempotencyRecord, IdentityAdoptionDecision, ImageProject, ImageVersion,
+		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingAuthSession,
+		PromoCode, PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting,
+		SubscriptionPlan, TLSFingerprintProfile, UsageCleanupTask, UsageLog, User,
+		UserAllowedGroup, UserAttributeDefinition, UserAttributeValue,
+		UserPlatformQuota, UserSubscription []ent.Interceptor
 	}
 )
 

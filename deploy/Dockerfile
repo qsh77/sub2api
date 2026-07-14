@@ -68,6 +68,8 @@ COPY backend/ ./
 COPY --from=frontend-builder /app/backend/internal/web/dist ./internal/web/dist
 
 # Build the binary (BuildType=release for CI builds, embed frontend)
+# Regenerate ent code first to include all schemas (both upstream and custom)
+RUN go generate ./ent/...
 # Version precedence: build arg VERSION > exact git tag > cmd/server/VERSION
 RUN VERSION_VALUE="${VERSION}" && \
     if [ -z "${VERSION_VALUE}" ]; then VERSION_VALUE="$(./scripts/resolve-version.sh)"; fi && \
