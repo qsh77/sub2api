@@ -33,6 +33,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
 	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
+	"github.com/Wei-Shaw/sub2api/ent/imageproject"
+	"github.com/Wei-Shaw/sub2api/ent/imageversion"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
@@ -98,6 +100,10 @@ type Client struct {
 	IdempotencyRecord *IdempotencyRecordClient
 	// IdentityAdoptionDecision is the client for interacting with the IdentityAdoptionDecision builders.
 	IdentityAdoptionDecision *IdentityAdoptionDecisionClient
+	// ImageProject is the client for interacting with the ImageProject builders.
+	ImageProject *ImageProjectClient
+	// ImageVersion is the client for interacting with the ImageVersion builders.
+	ImageVersion *ImageVersionClient
 	// PaymentAuditLog is the client for interacting with the PaymentAuditLog builders.
 	PaymentAuditLog *PaymentAuditLogClient
 	// PaymentOrder is the client for interacting with the PaymentOrder builders.
@@ -167,6 +173,8 @@ func (c *Client) init() {
 	c.Group = NewGroupClient(c.config)
 	c.IdempotencyRecord = NewIdempotencyRecordClient(c.config)
 	c.IdentityAdoptionDecision = NewIdentityAdoptionDecisionClient(c.config)
+	c.ImageProject = NewImageProjectClient(c.config)
+	c.ImageVersion = NewImageVersionClient(c.config)
 	c.PaymentAuditLog = NewPaymentAuditLogClient(c.config)
 	c.PaymentOrder = NewPaymentOrderClient(c.config)
 	c.PaymentProviderInstance = NewPaymentProviderInstanceClient(c.config)
@@ -297,6 +305,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Group:                         NewGroupClient(cfg),
 		IdempotencyRecord:             NewIdempotencyRecordClient(cfg),
 		IdentityAdoptionDecision:      NewIdentityAdoptionDecisionClient(cfg),
+		ImageProject:                  NewImageProjectClient(cfg),
+		ImageVersion:                  NewImageVersionClient(cfg),
 		PaymentAuditLog:               NewPaymentAuditLogClient(cfg),
 		PaymentOrder:                  NewPaymentOrderClient(cfg),
 		PaymentProviderInstance:       NewPaymentProviderInstanceClient(cfg),
@@ -354,6 +364,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Group:                         NewGroupClient(cfg),
 		IdempotencyRecord:             NewIdempotencyRecordClient(cfg),
 		IdentityAdoptionDecision:      NewIdentityAdoptionDecisionClient(cfg),
+		ImageProject:                  NewImageProjectClient(cfg),
+		ImageVersion:                  NewImageVersionClient(cfg),
 		PaymentAuditLog:               NewPaymentAuditLogClient(cfg),
 		PaymentOrder:                  NewPaymentOrderClient(cfg),
 		PaymentProviderInstance:       NewPaymentProviderInstanceClient(cfg),
@@ -408,11 +420,11 @@ func (c *Client) Use(hooks ...Hook) {
 		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
 		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
 		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.IdentityAdoptionDecision, c.ImageProject, c.ImageVersion, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Use(hooks...)
@@ -428,11 +440,11 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.BatchImageJob, c.ChannelMonitor, c.ChannelMonitorDailyRollup,
 		c.ChannelMonitorHistory, c.ChannelMonitorRequestTemplate,
 		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.IdentityAdoptionDecision, c.ImageProject, c.ImageVersion, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserPlatformQuota, c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
@@ -478,6 +490,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.IdempotencyRecord.mutate(ctx, m)
 	case *IdentityAdoptionDecisionMutation:
 		return c.IdentityAdoptionDecision.mutate(ctx, m)
+	case *ImageProjectMutation:
+		return c.ImageProject.mutate(ctx, m)
+	case *ImageVersionMutation:
+		return c.ImageVersion.mutate(ctx, m)
 	case *PaymentAuditLogMutation:
 		return c.PaymentAuditLog.mutate(ctx, m)
 	case *PaymentOrderMutation:
@@ -3418,6 +3434,338 @@ func (c *IdentityAdoptionDecisionClient) mutate(ctx context.Context, m *Identity
 	}
 }
 
+// ImageProjectClient is a client for the ImageProject schema.
+type ImageProjectClient struct {
+	config
+}
+
+// NewImageProjectClient returns a client for the ImageProject from the given config.
+func NewImageProjectClient(c config) *ImageProjectClient {
+	return &ImageProjectClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `imageproject.Hooks(f(g(h())))`.
+func (c *ImageProjectClient) Use(hooks ...Hook) {
+	c.hooks.ImageProject = append(c.hooks.ImageProject, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `imageproject.Intercept(f(g(h())))`.
+func (c *ImageProjectClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ImageProject = append(c.inters.ImageProject, interceptors...)
+}
+
+// Create returns a builder for creating a ImageProject entity.
+func (c *ImageProjectClient) Create() *ImageProjectCreate {
+	mutation := newImageProjectMutation(c.config, OpCreate)
+	return &ImageProjectCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ImageProject entities.
+func (c *ImageProjectClient) CreateBulk(builders ...*ImageProjectCreate) *ImageProjectCreateBulk {
+	return &ImageProjectCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ImageProjectClient) MapCreateBulk(slice any, setFunc func(*ImageProjectCreate, int)) *ImageProjectCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ImageProjectCreateBulk{err: fmt.Errorf("calling to ImageProjectClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ImageProjectCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ImageProjectCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ImageProject.
+func (c *ImageProjectClient) Update() *ImageProjectUpdate {
+	mutation := newImageProjectMutation(c.config, OpUpdate)
+	return &ImageProjectUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ImageProjectClient) UpdateOne(_m *ImageProject) *ImageProjectUpdateOne {
+	mutation := newImageProjectMutation(c.config, OpUpdateOne, withImageProject(_m))
+	return &ImageProjectUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ImageProjectClient) UpdateOneID(id int64) *ImageProjectUpdateOne {
+	mutation := newImageProjectMutation(c.config, OpUpdateOne, withImageProjectID(id))
+	return &ImageProjectUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ImageProject.
+func (c *ImageProjectClient) Delete() *ImageProjectDelete {
+	mutation := newImageProjectMutation(c.config, OpDelete)
+	return &ImageProjectDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ImageProjectClient) DeleteOne(_m *ImageProject) *ImageProjectDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ImageProjectClient) DeleteOneID(id int64) *ImageProjectDeleteOne {
+	builder := c.Delete().Where(imageproject.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ImageProjectDeleteOne{builder}
+}
+
+// Query returns a query builder for ImageProject.
+func (c *ImageProjectClient) Query() *ImageProjectQuery {
+	return &ImageProjectQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeImageProject},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ImageProject entity by its id.
+func (c *ImageProjectClient) Get(ctx context.Context, id int64) (*ImageProject, error) {
+	return c.Query().Where(imageproject.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ImageProjectClient) GetX(ctx context.Context, id int64) *ImageProject {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryUser queries the user edge of a ImageProject.
+func (c *ImageProjectClient) QueryUser(_m *ImageProject) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(imageproject.Table, imageproject.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, imageproject.UserTable, imageproject.UserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryVersions queries the versions edge of a ImageProject.
+func (c *ImageProjectClient) QueryVersions(_m *ImageProject) *ImageVersionQuery {
+	query := (&ImageVersionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(imageproject.Table, imageproject.FieldID, id),
+			sqlgraph.To(imageversion.Table, imageversion.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, imageproject.VersionsTable, imageproject.VersionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ImageProjectClient) Hooks() []Hook {
+	hooks := c.hooks.ImageProject
+	return append(hooks[:len(hooks):len(hooks)], imageproject.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *ImageProjectClient) Interceptors() []Interceptor {
+	inters := c.inters.ImageProject
+	return append(inters[:len(inters):len(inters)], imageproject.Interceptors[:]...)
+}
+
+func (c *ImageProjectClient) mutate(ctx context.Context, m *ImageProjectMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ImageProjectCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ImageProjectUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ImageProjectUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ImageProjectDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ImageProject mutation op: %q", m.Op())
+	}
+}
+
+// ImageVersionClient is a client for the ImageVersion schema.
+type ImageVersionClient struct {
+	config
+}
+
+// NewImageVersionClient returns a client for the ImageVersion from the given config.
+func NewImageVersionClient(c config) *ImageVersionClient {
+	return &ImageVersionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `imageversion.Hooks(f(g(h())))`.
+func (c *ImageVersionClient) Use(hooks ...Hook) {
+	c.hooks.ImageVersion = append(c.hooks.ImageVersion, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `imageversion.Intercept(f(g(h())))`.
+func (c *ImageVersionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ImageVersion = append(c.inters.ImageVersion, interceptors...)
+}
+
+// Create returns a builder for creating a ImageVersion entity.
+func (c *ImageVersionClient) Create() *ImageVersionCreate {
+	mutation := newImageVersionMutation(c.config, OpCreate)
+	return &ImageVersionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ImageVersion entities.
+func (c *ImageVersionClient) CreateBulk(builders ...*ImageVersionCreate) *ImageVersionCreateBulk {
+	return &ImageVersionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ImageVersionClient) MapCreateBulk(slice any, setFunc func(*ImageVersionCreate, int)) *ImageVersionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ImageVersionCreateBulk{err: fmt.Errorf("calling to ImageVersionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ImageVersionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ImageVersionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ImageVersion.
+func (c *ImageVersionClient) Update() *ImageVersionUpdate {
+	mutation := newImageVersionMutation(c.config, OpUpdate)
+	return &ImageVersionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ImageVersionClient) UpdateOne(_m *ImageVersion) *ImageVersionUpdateOne {
+	mutation := newImageVersionMutation(c.config, OpUpdateOne, withImageVersion(_m))
+	return &ImageVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ImageVersionClient) UpdateOneID(id int64) *ImageVersionUpdateOne {
+	mutation := newImageVersionMutation(c.config, OpUpdateOne, withImageVersionID(id))
+	return &ImageVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ImageVersion.
+func (c *ImageVersionClient) Delete() *ImageVersionDelete {
+	mutation := newImageVersionMutation(c.config, OpDelete)
+	return &ImageVersionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ImageVersionClient) DeleteOne(_m *ImageVersion) *ImageVersionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ImageVersionClient) DeleteOneID(id int64) *ImageVersionDeleteOne {
+	builder := c.Delete().Where(imageversion.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ImageVersionDeleteOne{builder}
+}
+
+// Query returns a query builder for ImageVersion.
+func (c *ImageVersionClient) Query() *ImageVersionQuery {
+	return &ImageVersionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeImageVersion},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ImageVersion entity by its id.
+func (c *ImageVersionClient) Get(ctx context.Context, id int64) (*ImageVersion, error) {
+	return c.Query().Where(imageversion.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ImageVersionClient) GetX(ctx context.Context, id int64) *ImageVersion {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryProject queries the project edge of a ImageVersion.
+func (c *ImageVersionClient) QueryProject(_m *ImageVersion) *ImageProjectQuery {
+	query := (&ImageProjectClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(imageversion.Table, imageversion.FieldID, id),
+			sqlgraph.To(imageproject.Table, imageproject.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, imageversion.ProjectTable, imageversion.ProjectColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUser queries the user edge of a ImageVersion.
+func (c *ImageVersionClient) QueryUser(_m *ImageVersion) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(imageversion.Table, imageversion.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, imageversion.UserTable, imageversion.UserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ImageVersionClient) Hooks() []Hook {
+	return c.hooks.ImageVersion
+}
+
+// Interceptors returns the client interceptors.
+func (c *ImageVersionClient) Interceptors() []Interceptor {
+	return c.inters.ImageVersion
+}
+
+func (c *ImageVersionClient) mutate(ctx context.Context, m *ImageVersionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ImageVersionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ImageVersionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ImageVersionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ImageVersionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ImageVersion mutation op: %q", m.Op())
+	}
+}
+
 // PaymentAuditLogClient is a client for the PaymentAuditLog schema.
 type PaymentAuditLogClient struct {
 	config
@@ -5838,6 +6186,38 @@ func (c *UserClient) QueryPlatformQuotas(_m *User) *UserPlatformQuotaQuery {
 	return query
 }
 
+// QueryImageProjects queries the image_projects edge of a User.
+func (c *UserClient) QueryImageProjects(_m *User) *ImageProjectQuery {
+	query := (&ImageProjectClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(imageproject.Table, imageproject.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.ImageProjectsTable, user.ImageProjectsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryImageVersions queries the image_versions edge of a User.
+func (c *UserClient) QueryImageVersions(_m *User) *ImageVersionQuery {
+	query := (&ImageVersionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(imageversion.Table, imageversion.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.ImageVersionsTable, user.ImageVersionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryUserAllowedGroups queries the user_allowed_groups edge of a User.
 func (c *UserClient) QueryUserAllowedGroups(_m *User) *UserAllowedGroupQuery {
 	query := (&UserAllowedGroupClient{config: c.config}).Query()
@@ -6670,22 +7050,24 @@ type (
 		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
 		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
 		ChannelMonitorRequestTemplate, ErrorPassthroughRule, Group, IdempotencyRecord,
-		IdentityAdoptionDecision, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PendingAuthSession, PromoCode, PromoCodeUsage, Proxy,
-		RedeemCode, SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
-		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
-		UserAttributeValue, UserPlatformQuota, UserSubscription []ent.Hook
+		IdentityAdoptionDecision, ImageProject, ImageVersion, PaymentAuditLog,
+		PaymentOrder, PaymentProviderInstance, PendingAuthSession, PromoCode,
+		PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting, SubscriptionPlan,
+		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
+		UserAttributeDefinition, UserAttributeValue, UserPlatformQuota,
+		UserSubscription []ent.Hook
 	}
 	inters struct {
 		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
 		AuthIdentityChannel, BatchImageEvent, BatchImageItem, BatchImageJob,
 		ChannelMonitor, ChannelMonitorDailyRollup, ChannelMonitorHistory,
 		ChannelMonitorRequestTemplate, ErrorPassthroughRule, Group, IdempotencyRecord,
-		IdentityAdoptionDecision, PaymentAuditLog, PaymentOrder,
-		PaymentProviderInstance, PendingAuthSession, PromoCode, PromoCodeUsage, Proxy,
-		RedeemCode, SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
-		UsageCleanupTask, UsageLog, User, UserAllowedGroup, UserAttributeDefinition,
-		UserAttributeValue, UserPlatformQuota, UserSubscription []ent.Interceptor
+		IdentityAdoptionDecision, ImageProject, ImageVersion, PaymentAuditLog,
+		PaymentOrder, PaymentProviderInstance, PendingAuthSession, PromoCode,
+		PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting, SubscriptionPlan,
+		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
+		UserAttributeDefinition, UserAttributeValue, UserPlatformQuota,
+		UserSubscription []ent.Interceptor
 	}
 )
 

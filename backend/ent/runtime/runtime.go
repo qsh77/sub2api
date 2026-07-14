@@ -23,6 +23,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
 	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
+	"github.com/Wei-Shaw/sub2api/ent/imageproject"
+	"github.com/Wei-Shaw/sub2api/ent/imageversion"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
@@ -1155,6 +1157,121 @@ func init() {
 	identityadoptiondecisionDescDecidedAt := identityadoptiondecisionFields[4].Descriptor()
 	// identityadoptiondecision.DefaultDecidedAt holds the default value on creation for the decided_at field.
 	identityadoptiondecision.DefaultDecidedAt = identityadoptiondecisionDescDecidedAt.Default.(func() time.Time)
+	imageprojectMixin := schema.ImageProject{}.Mixin()
+	imageprojectMixinHooks1 := imageprojectMixin[1].Hooks()
+	imageproject.Hooks[0] = imageprojectMixinHooks1[0]
+	imageprojectMixinInters1 := imageprojectMixin[1].Interceptors()
+	imageproject.Interceptors[0] = imageprojectMixinInters1[0]
+	imageprojectMixinFields0 := imageprojectMixin[0].Fields()
+	_ = imageprojectMixinFields0
+	imageprojectFields := schema.ImageProject{}.Fields()
+	_ = imageprojectFields
+	// imageprojectDescCreatedAt is the schema descriptor for created_at field.
+	imageprojectDescCreatedAt := imageprojectMixinFields0[0].Descriptor()
+	// imageproject.DefaultCreatedAt holds the default value on creation for the created_at field.
+	imageproject.DefaultCreatedAt = imageprojectDescCreatedAt.Default.(func() time.Time)
+	// imageprojectDescUpdatedAt is the schema descriptor for updated_at field.
+	imageprojectDescUpdatedAt := imageprojectMixinFields0[1].Descriptor()
+	// imageproject.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	imageproject.DefaultUpdatedAt = imageprojectDescUpdatedAt.Default.(func() time.Time)
+	// imageproject.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	imageproject.UpdateDefaultUpdatedAt = imageprojectDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// imageprojectDescTitle is the schema descriptor for title field.
+	imageprojectDescTitle := imageprojectFields[1].Descriptor()
+	// imageproject.DefaultTitle holds the default value on creation for the title field.
+	imageproject.DefaultTitle = imageprojectDescTitle.Default.(string)
+	// imageproject.TitleValidator is a validator for the "title" field. It is called by the builders before save.
+	imageproject.TitleValidator = imageprojectDescTitle.Validators[0].(func(string) error)
+	// imageprojectDescStatus is the schema descriptor for status field.
+	imageprojectDescStatus := imageprojectFields[3].Descriptor()
+	// imageproject.DefaultStatus holds the default value on creation for the status field.
+	imageproject.DefaultStatus = imageprojectDescStatus.Default.(string)
+	// imageproject.StatusValidator is a validator for the "status" field. It is called by the builders before save.
+	imageproject.StatusValidator = imageprojectDescStatus.Validators[0].(func(string) error)
+	imageversionFields := schema.ImageVersion{}.Fields()
+	_ = imageversionFields
+	// imageversionDescMode is the schema descriptor for mode field.
+	imageversionDescMode := imageversionFields[4].Descriptor()
+	// imageversion.ModeValidator is a validator for the "mode" field. It is called by the builders before save.
+	imageversion.ModeValidator = func() func(string) error {
+		validators := imageversionDescMode.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(mode string) error {
+			for _, fn := range fns {
+				if err := fn(mode); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// imageversionDescPrompt is the schema descriptor for prompt field.
+	imageversionDescPrompt := imageversionFields[5].Descriptor()
+	// imageversion.DefaultPrompt holds the default value on creation for the prompt field.
+	imageversion.DefaultPrompt = imageversionDescPrompt.Default.(string)
+	// imageversionDescModel is the schema descriptor for model field.
+	imageversionDescModel := imageversionFields[7].Descriptor()
+	// imageversion.DefaultModel holds the default value on creation for the model field.
+	imageversion.DefaultModel = imageversionDescModel.Default.(string)
+	// imageversion.ModelValidator is a validator for the "model" field. It is called by the builders before save.
+	imageversion.ModelValidator = imageversionDescModel.Validators[0].(func(string) error)
+	// imageversionDescSize is the schema descriptor for size field.
+	imageversionDescSize := imageversionFields[8].Descriptor()
+	// imageversion.DefaultSize holds the default value on creation for the size field.
+	imageversion.DefaultSize = imageversionDescSize.Default.(string)
+	// imageversion.SizeValidator is a validator for the "size" field. It is called by the builders before save.
+	imageversion.SizeValidator = imageversionDescSize.Validators[0].(func(string) error)
+	// imageversionDescMimeType is the schema descriptor for mime_type field.
+	imageversionDescMimeType := imageversionFields[9].Descriptor()
+	// imageversion.MimeTypeValidator is a validator for the "mime_type" field. It is called by the builders before save.
+	imageversion.MimeTypeValidator = func() func(string) error {
+		validators := imageversionDescMimeType.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(mime_type string) error {
+			for _, fn := range fns {
+				if err := fn(mime_type); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// imageversionDescFilePath is the schema descriptor for file_path field.
+	imageversionDescFilePath := imageversionFields[10].Descriptor()
+	// imageversion.FilePathValidator is a validator for the "file_path" field. It is called by the builders before save.
+	imageversion.FilePathValidator = imageversionDescFilePath.Validators[0].(func(string) error)
+	// imageversionDescFileSizeBytes is the schema descriptor for file_size_bytes field.
+	imageversionDescFileSizeBytes := imageversionFields[11].Descriptor()
+	// imageversion.DefaultFileSizeBytes holds the default value on creation for the file_size_bytes field.
+	imageversion.DefaultFileSizeBytes = imageversionDescFileSizeBytes.Default.(int64)
+	// imageversionDescSha256 is the schema descriptor for sha256 field.
+	imageversionDescSha256 := imageversionFields[12].Descriptor()
+	// imageversion.DefaultSha256 holds the default value on creation for the sha256 field.
+	imageversion.DefaultSha256 = imageversionDescSha256.Default.(string)
+	// imageversion.Sha256Validator is a validator for the "sha256" field. It is called by the builders before save.
+	imageversion.Sha256Validator = imageversionDescSha256.Validators[0].(func(string) error)
+	// imageversionDescWidth is the schema descriptor for width field.
+	imageversionDescWidth := imageversionFields[13].Descriptor()
+	// imageversion.DefaultWidth holds the default value on creation for the width field.
+	imageversion.DefaultWidth = imageversionDescWidth.Default.(int)
+	// imageversionDescHeight is the schema descriptor for height field.
+	imageversionDescHeight := imageversionFields[14].Descriptor()
+	// imageversion.DefaultHeight holds the default value on creation for the height field.
+	imageversion.DefaultHeight = imageversionDescHeight.Default.(int)
+	// imageversionDescMaskMimeType is the schema descriptor for mask_mime_type field.
+	imageversionDescMaskMimeType := imageversionFields[16].Descriptor()
+	// imageversion.MaskMimeTypeValidator is a validator for the "mask_mime_type" field. It is called by the builders before save.
+	imageversion.MaskMimeTypeValidator = imageversionDescMaskMimeType.Validators[0].(func(string) error)
+	// imageversionDescCreatedAt is the schema descriptor for created_at field.
+	imageversionDescCreatedAt := imageversionFields[19].Descriptor()
+	// imageversion.DefaultCreatedAt holds the default value on creation for the created_at field.
+	imageversion.DefaultCreatedAt = imageversionDescCreatedAt.Default.(func() time.Time)
 	paymentauditlogFields := schema.PaymentAuditLog{}.Fields()
 	_ = paymentauditlogFields
 	// paymentauditlogDescOrderID is the schema descriptor for order_id field.

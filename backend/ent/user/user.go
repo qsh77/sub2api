@@ -89,6 +89,10 @@ const (
 	EdgePendingAuthSessions = "pending_auth_sessions"
 	// EdgePlatformQuotas holds the string denoting the platform_quotas edge name in mutations.
 	EdgePlatformQuotas = "platform_quotas"
+	// EdgeImageProjects holds the string denoting the image_projects edge name in mutations.
+	EdgeImageProjects = "image_projects"
+	// EdgeImageVersions holds the string denoting the image_versions edge name in mutations.
+	EdgeImageVersions = "image_versions"
 	// EdgeUserAllowedGroups holds the string denoting the user_allowed_groups edge name in mutations.
 	EdgeUserAllowedGroups = "user_allowed_groups"
 	// Table holds the table name of the user in the database.
@@ -182,6 +186,20 @@ const (
 	PlatformQuotasInverseTable = "user_platform_quotas"
 	// PlatformQuotasColumn is the table column denoting the platform_quotas relation/edge.
 	PlatformQuotasColumn = "user_id"
+	// ImageProjectsTable is the table that holds the image_projects relation/edge.
+	ImageProjectsTable = "image_projects"
+	// ImageProjectsInverseTable is the table name for the ImageProject entity.
+	// It exists in this package in order to avoid circular dependency with the "imageproject" package.
+	ImageProjectsInverseTable = "image_projects"
+	// ImageProjectsColumn is the table column denoting the image_projects relation/edge.
+	ImageProjectsColumn = "user_id"
+	// ImageVersionsTable is the table that holds the image_versions relation/edge.
+	ImageVersionsTable = "image_versions"
+	// ImageVersionsInverseTable is the table name for the ImageVersion entity.
+	// It exists in this package in order to avoid circular dependency with the "imageversion" package.
+	ImageVersionsInverseTable = "image_versions"
+	// ImageVersionsColumn is the table column denoting the image_versions relation/edge.
+	ImageVersionsColumn = "user_id"
 	// UserAllowedGroupsTable is the table that holds the user_allowed_groups relation/edge.
 	UserAllowedGroupsTable = "user_allowed_groups"
 	// UserAllowedGroupsInverseTable is the table name for the UserAllowedGroup entity.
@@ -602,6 +620,34 @@ func ByPlatformQuotas(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByImageProjectsCount orders the results by image_projects count.
+func ByImageProjectsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newImageProjectsStep(), opts...)
+	}
+}
+
+// ByImageProjects orders the results by image_projects terms.
+func ByImageProjects(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newImageProjectsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByImageVersionsCount orders the results by image_versions count.
+func ByImageVersionsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newImageVersionsStep(), opts...)
+	}
+}
+
+// ByImageVersions orders the results by image_versions terms.
+func ByImageVersions(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newImageVersionsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByUserAllowedGroupsCount orders the results by user_allowed_groups count.
 func ByUserAllowedGroupsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -704,6 +750,20 @@ func newPlatformQuotasStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(PlatformQuotasInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, PlatformQuotasTable, PlatformQuotasColumn),
+	)
+}
+func newImageProjectsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ImageProjectsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ImageProjectsTable, ImageProjectsColumn),
+	)
+}
+func newImageVersionsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ImageVersionsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ImageVersionsTable, ImageVersionsColumn),
 	)
 }
 func newUserAllowedGroupsStep() *sqlgraph.Step {
