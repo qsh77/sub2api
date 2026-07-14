@@ -15,8 +15,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
 	"github.com/Wei-Shaw/sub2api/ent/group"
-	"github.com/Wei-Shaw/sub2api/ent/imageproject"
-	"github.com/Wei-Shaw/sub2api/ent/imageversion"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
@@ -128,6 +126,27 @@ func (_u *UserUpdate) SetNillableBalance(v *float64) *UserUpdate {
 // AddBalance adds value to the "balance" field.
 func (_u *UserUpdate) AddBalance(v float64) *UserUpdate {
 	_u.mutation.AddBalance(v)
+	return _u
+}
+
+// SetFrozenBalance sets the "frozen_balance" field.
+func (_u *UserUpdate) SetFrozenBalance(v float64) *UserUpdate {
+	_u.mutation.ResetFrozenBalance()
+	_u.mutation.SetFrozenBalance(v)
+	return _u
+}
+
+// SetNillableFrozenBalance sets the "frozen_balance" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableFrozenBalance(v *float64) *UserUpdate {
+	if v != nil {
+		_u.SetFrozenBalance(*v)
+	}
+	return _u
+}
+
+// AddFrozenBalance adds value to the "frozen_balance" field.
+func (_u *UserUpdate) AddFrozenBalance(v float64) *UserUpdate {
+	_u.mutation.AddFrozenBalance(v)
 	return _u
 }
 
@@ -608,36 +627,6 @@ func (_u *UserUpdate) AddPlatformQuotas(v ...*UserPlatformQuota) *UserUpdate {
 	return _u.AddPlatformQuotaIDs(ids...)
 }
 
-// AddImageProjectIDs adds the "image_projects" edge to the ImageProject entity by IDs.
-func (_u *UserUpdate) AddImageProjectIDs(ids ...int64) *UserUpdate {
-	_u.mutation.AddImageProjectIDs(ids...)
-	return _u
-}
-
-// AddImageProjects adds the "image_projects" edges to the ImageProject entity.
-func (_u *UserUpdate) AddImageProjects(v ...*ImageProject) *UserUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddImageProjectIDs(ids...)
-}
-
-// AddImageVersionIDs adds the "image_versions" edge to the ImageVersion entity by IDs.
-func (_u *UserUpdate) AddImageVersionIDs(ids ...int64) *UserUpdate {
-	_u.mutation.AddImageVersionIDs(ids...)
-	return _u
-}
-
-// AddImageVersions adds the "image_versions" edges to the ImageVersion entity.
-func (_u *UserUpdate) AddImageVersions(v ...*ImageVersion) *UserUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddImageVersionIDs(ids...)
-}
-
 // Mutation returns the UserMutation object of the builder.
 func (_u *UserUpdate) Mutation() *UserMutation {
 	return _u.mutation
@@ -916,48 +905,6 @@ func (_u *UserUpdate) RemovePlatformQuotas(v ...*UserPlatformQuota) *UserUpdate 
 	return _u.RemovePlatformQuotaIDs(ids...)
 }
 
-// ClearImageProjects clears all "image_projects" edges to the ImageProject entity.
-func (_u *UserUpdate) ClearImageProjects() *UserUpdate {
-	_u.mutation.ClearImageProjects()
-	return _u
-}
-
-// RemoveImageProjectIDs removes the "image_projects" edge to ImageProject entities by IDs.
-func (_u *UserUpdate) RemoveImageProjectIDs(ids ...int64) *UserUpdate {
-	_u.mutation.RemoveImageProjectIDs(ids...)
-	return _u
-}
-
-// RemoveImageProjects removes "image_projects" edges to ImageProject entities.
-func (_u *UserUpdate) RemoveImageProjects(v ...*ImageProject) *UserUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveImageProjectIDs(ids...)
-}
-
-// ClearImageVersions clears all "image_versions" edges to the ImageVersion entity.
-func (_u *UserUpdate) ClearImageVersions() *UserUpdate {
-	_u.mutation.ClearImageVersions()
-	return _u
-}
-
-// RemoveImageVersionIDs removes the "image_versions" edge to ImageVersion entities by IDs.
-func (_u *UserUpdate) RemoveImageVersionIDs(ids ...int64) *UserUpdate {
-	_u.mutation.RemoveImageVersionIDs(ids...)
-	return _u
-}
-
-// RemoveImageVersions removes "image_versions" edges to ImageVersion entities.
-func (_u *UserUpdate) RemoveImageVersions(v ...*ImageVersion) *UserUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveImageVersionIDs(ids...)
-}
-
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (_u *UserUpdate) Save(ctx context.Context) (int, error) {
 	if err := _u.defaults(); err != nil {
@@ -1070,6 +1017,12 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedBalance(); ok {
 		_spec.AddField(user.FieldBalance, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.FrozenBalance(); ok {
+		_spec.SetField(user.FieldFrozenBalance, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedFrozenBalance(); ok {
+		_spec.AddField(user.FieldFrozenBalance, field.TypeFloat64, value)
 	}
 	if value, ok := _u.mutation.Concurrency(); ok {
 		_spec.SetField(user.FieldConcurrency, field.TypeInt, value)
@@ -1743,96 +1696,6 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if _u.mutation.ImageProjectsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.ImageProjectsTable,
-			Columns: []string{user.ImageProjectsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(imageproject.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedImageProjectsIDs(); len(nodes) > 0 && !_u.mutation.ImageProjectsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.ImageProjectsTable,
-			Columns: []string{user.ImageProjectsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(imageproject.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.ImageProjectsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.ImageProjectsTable,
-			Columns: []string{user.ImageProjectsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(imageproject.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.ImageVersionsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.ImageVersionsTable,
-			Columns: []string{user.ImageVersionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(imageversion.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedImageVersionsIDs(); len(nodes) > 0 && !_u.mutation.ImageVersionsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.ImageVersionsTable,
-			Columns: []string{user.ImageVersionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(imageversion.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.ImageVersionsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.ImageVersionsTable,
-			Columns: []string{user.ImageVersionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(imageversion.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{user.Label}
@@ -1939,6 +1802,27 @@ func (_u *UserUpdateOne) SetNillableBalance(v *float64) *UserUpdateOne {
 // AddBalance adds value to the "balance" field.
 func (_u *UserUpdateOne) AddBalance(v float64) *UserUpdateOne {
 	_u.mutation.AddBalance(v)
+	return _u
+}
+
+// SetFrozenBalance sets the "frozen_balance" field.
+func (_u *UserUpdateOne) SetFrozenBalance(v float64) *UserUpdateOne {
+	_u.mutation.ResetFrozenBalance()
+	_u.mutation.SetFrozenBalance(v)
+	return _u
+}
+
+// SetNillableFrozenBalance sets the "frozen_balance" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableFrozenBalance(v *float64) *UserUpdateOne {
+	if v != nil {
+		_u.SetFrozenBalance(*v)
+	}
+	return _u
+}
+
+// AddFrozenBalance adds value to the "frozen_balance" field.
+func (_u *UserUpdateOne) AddFrozenBalance(v float64) *UserUpdateOne {
+	_u.mutation.AddFrozenBalance(v)
 	return _u
 }
 
@@ -2419,36 +2303,6 @@ func (_u *UserUpdateOne) AddPlatformQuotas(v ...*UserPlatformQuota) *UserUpdateO
 	return _u.AddPlatformQuotaIDs(ids...)
 }
 
-// AddImageProjectIDs adds the "image_projects" edge to the ImageProject entity by IDs.
-func (_u *UserUpdateOne) AddImageProjectIDs(ids ...int64) *UserUpdateOne {
-	_u.mutation.AddImageProjectIDs(ids...)
-	return _u
-}
-
-// AddImageProjects adds the "image_projects" edges to the ImageProject entity.
-func (_u *UserUpdateOne) AddImageProjects(v ...*ImageProject) *UserUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddImageProjectIDs(ids...)
-}
-
-// AddImageVersionIDs adds the "image_versions" edge to the ImageVersion entity by IDs.
-func (_u *UserUpdateOne) AddImageVersionIDs(ids ...int64) *UserUpdateOne {
-	_u.mutation.AddImageVersionIDs(ids...)
-	return _u
-}
-
-// AddImageVersions adds the "image_versions" edges to the ImageVersion entity.
-func (_u *UserUpdateOne) AddImageVersions(v ...*ImageVersion) *UserUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddImageVersionIDs(ids...)
-}
-
 // Mutation returns the UserMutation object of the builder.
 func (_u *UserUpdateOne) Mutation() *UserMutation {
 	return _u.mutation
@@ -2727,48 +2581,6 @@ func (_u *UserUpdateOne) RemovePlatformQuotas(v ...*UserPlatformQuota) *UserUpda
 	return _u.RemovePlatformQuotaIDs(ids...)
 }
 
-// ClearImageProjects clears all "image_projects" edges to the ImageProject entity.
-func (_u *UserUpdateOne) ClearImageProjects() *UserUpdateOne {
-	_u.mutation.ClearImageProjects()
-	return _u
-}
-
-// RemoveImageProjectIDs removes the "image_projects" edge to ImageProject entities by IDs.
-func (_u *UserUpdateOne) RemoveImageProjectIDs(ids ...int64) *UserUpdateOne {
-	_u.mutation.RemoveImageProjectIDs(ids...)
-	return _u
-}
-
-// RemoveImageProjects removes "image_projects" edges to ImageProject entities.
-func (_u *UserUpdateOne) RemoveImageProjects(v ...*ImageProject) *UserUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveImageProjectIDs(ids...)
-}
-
-// ClearImageVersions clears all "image_versions" edges to the ImageVersion entity.
-func (_u *UserUpdateOne) ClearImageVersions() *UserUpdateOne {
-	_u.mutation.ClearImageVersions()
-	return _u
-}
-
-// RemoveImageVersionIDs removes the "image_versions" edge to ImageVersion entities by IDs.
-func (_u *UserUpdateOne) RemoveImageVersionIDs(ids ...int64) *UserUpdateOne {
-	_u.mutation.RemoveImageVersionIDs(ids...)
-	return _u
-}
-
-// RemoveImageVersions removes "image_versions" edges to ImageVersion entities.
-func (_u *UserUpdateOne) RemoveImageVersions(v ...*ImageVersion) *UserUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveImageVersionIDs(ids...)
-}
-
 // Where appends a list predicates to the UserUpdate builder.
 func (_u *UserUpdateOne) Where(ps ...predicate.User) *UserUpdateOne {
 	_u.mutation.Where(ps...)
@@ -2911,6 +2723,12 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	}
 	if value, ok := _u.mutation.AddedBalance(); ok {
 		_spec.AddField(user.FieldBalance, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.FrozenBalance(); ok {
+		_spec.SetField(user.FieldFrozenBalance, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedFrozenBalance(); ok {
+		_spec.AddField(user.FieldFrozenBalance, field.TypeFloat64, value)
 	}
 	if value, ok := _u.mutation.Concurrency(); ok {
 		_spec.SetField(user.FieldConcurrency, field.TypeInt, value)
@@ -3577,96 +3395,6 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(userplatformquota.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.ImageProjectsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.ImageProjectsTable,
-			Columns: []string{user.ImageProjectsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(imageproject.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedImageProjectsIDs(); len(nodes) > 0 && !_u.mutation.ImageProjectsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.ImageProjectsTable,
-			Columns: []string{user.ImageProjectsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(imageproject.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.ImageProjectsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.ImageProjectsTable,
-			Columns: []string{user.ImageProjectsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(imageproject.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.ImageVersionsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.ImageVersionsTable,
-			Columns: []string{user.ImageVersionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(imageversion.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedImageVersionsIDs(); len(nodes) > 0 && !_u.mutation.ImageVersionsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.ImageVersionsTable,
-			Columns: []string{user.ImageVersionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(imageversion.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.ImageVersionsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.ImageVersionsTable,
-			Columns: []string{user.ImageVersionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(imageversion.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {
