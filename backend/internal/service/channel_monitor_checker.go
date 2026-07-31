@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
 	"github.com/tidwall/gjson"
 )
 
@@ -20,32 +21,21 @@ import (
 // 自定义 Transport 在 dial 时强制再次校验 IP，防止 DNS rebinding 绕过 validateEndpoint。
 var monitorHTTPClient = newSSRFSafeHTTPClient(monitorRequestTimeout)
 
-// monitorImageHTTPClient 给图片生成监控使用。图片接口常在生成完成前不返回响应头，
-// 需要独立放宽，避免把慢图生成功能误判成网络错误。
-var monitorImageHTTPClient = newSSRFSafeHTTPClientWithResponseHeaderTimeout(
-	monitorImageRequestTimeout,
-	monitorImageResponseHeaderTimeout,
-)
-
 // monitorPingHTTPClient 用于 endpoint origin 的 HEAD ping，超时更短。
 var monitorPingHTTPClient = newSSRFSafeHTTPClient(monitorPingTimeout)
 
 // newSSRFSafeHTTPClient 返回一个使用 safeDialContext 的 http.Client。
 // 仅供监控模块对外发起请求使用——所有目标都应是公网 endpoint。
 func newSSRFSafeHTTPClient(timeout time.Duration) *http.Client {
-	return newSSRFSafeHTTPClientWithResponseHeaderTimeout(timeout, monitorResponseHeaderTimeout)
-}
-
-func newSSRFSafeHTTPClientWithResponseHeaderTimeout(timeout, responseHeaderTimeout time.Duration) *http.Client {
 	tr := &http.Transport{
 		DialContext:           safeDialContext,
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          16,
 		IdleConnTimeout:       monitorIdleConnTimeout,
 		TLSHandshakeTimeout:   monitorTLSHandshakeTimeout,
-		ResponseHeaderTimeout: responseHeaderTimeout,
+		ResponseHeaderTimeout: monitorResponseHeaderTimeout,
 	}
-	return &http.Client{Timeout: timeout, Transport: tr}
+	return &http.Client{Timeout: timeout, Transport: servertiming.WrapRoundTripper(tr)}
 }
 
 // CheckOptions 承载一次检测的自定义入参。
@@ -61,9 +51,6 @@ type CheckOptions struct {
 	// 在 replace 模式下直接当作完整 body。
 	BodyOverride map[string]any
 }
-
-const monitorOpenAIImagePrompt = "Generate a simple health-check image: a small blue circle centered on a white background. No text."
-const monitorAPIModeOpenAIImages = "images"
 
 // runCheckForModel 对单个 (provider, model) 做一次完整检测。
 // 不返回 error：所有失败都包装进 CheckResult.Status=error/failed。
@@ -97,19 +84,6 @@ func runCheckForModel(ctx context.Context, provider, endpoint, apiKey, model str
 		bodySnippet := truncateForErrorBody(rawBody)
 		res.Message = truncateMessage(sanitizeErrorMessage(fmt.Sprintf("upstream HTTP %d: %s", statusCode, bodySnippet)))
 		return res
-	}
-
-	if isOpenAIImagesCheck(provider, model) {
-		imageCount := countOpenAIResponseImageOutputsFromJSONBytes([]byte(rawBody))
-		if imageCount == 0 {
-			imageCount = countOpenAIImageOutputsFromSSEBody(rawBody)
-		}
-		if imageCount == 0 {
-			res.Status = MonitorStatusFailed
-			res.Message = truncateMessage("image check returned 2xx without image output")
-			return res
-		}
-		return finalizeOperationalOrDegraded(res, latency, latencyMs)
 	}
 
 	// Replace 模式：跳过 challenge 校验（用户 body 是静态的，challenge 没法嵌入）。
@@ -175,11 +149,11 @@ func pingEndpointOrigin(ctx context.Context, endpoint string) *int {
 	return &ms
 }
 
-// providerAdapter 描述某个 provider 在 challenge 检测中需要的 4 件事：
+// providerAdapter 描述某个 provider 在 challenge 检测中需要的几件事：
 //   - 拼出请求路径（含 model 占位）
 //   - 序列化请求体
 //   - 构造鉴权头
-//   - 从响应 JSON 中按 path 提取文本（gjson path）
+//   - 从响应 JSON 中提取文本（默认按 gjson path；需要时可自定义）
 //
 // 加新 provider 只需要在 providerAdapters 里增加一个条目，无需触碰 callProvider / validateProvider。
 type providerAdapter struct {
@@ -187,6 +161,7 @@ type providerAdapter struct {
 	buildBody    func(model, prompt string) ([]byte, error)
 	buildHeaders func(apiKey string) map[string]string
 	textPath     string // gjson 提取响应文本的 path
+	extractText  func([]byte) string
 }
 
 // providerAdapters 全部已支持的 provider。键值即 MonitorProvider* 字符串。
@@ -194,6 +169,7 @@ type providerAdapter struct {
 //nolint:gochecknoglobals // 适配器表是只读静态数据，初始化后不变更。
 var providerAdapters = map[string]providerAdapter{
 	MonitorProviderOpenAI: providerOpenAIChatAdapter,
+	MonitorProviderGrok:   providerGrokChatAdapter,
 	MonitorProviderAnthropic: {
 		buildPath: func(string) string { return providerAnthropicPath },
 		buildBody: func(model, prompt string) ([]byte, error) {
@@ -209,7 +185,7 @@ var providerAdapters = map[string]providerAdapter{
 				"anthropic-version": monitorAnthropicAPIVersion,
 			}
 		},
-		textPath: "content.0.text",
+		extractText: extractAnthropicMonitorText,
 	},
 	MonitorProviderGemini: {
 		// Gemini 把 model 名写在 URL path 上：/v1beta/models/{model}:generateContent
@@ -231,20 +207,27 @@ var providerAdapters = map[string]providerAdapter{
 }
 
 //nolint:gochecknoglobals // 适配器表是只读静态数据，初始化后不变更。
-var providerOpenAIChatAdapter = providerAdapter{
-	buildPath: func(string) string { return providerOpenAIPath },
-	buildBody: func(model, prompt string) ([]byte, error) {
-		return json.Marshal(map[string]any{
-			"model":      model,
-			"messages":   []map[string]string{{"role": "user", "content": prompt}},
-			"max_tokens": monitorChallengeMaxTokens,
-			"stream":     false,
-		})
-	},
-	buildHeaders: func(apiKey string) map[string]string {
-		return map[string]string{"Authorization": "Bearer " + apiKey}
-	},
-	textPath: "choices.0.message.content",
+var providerOpenAIChatAdapter = newOpenAICompatibleChatAdapter(providerOpenAIPath)
+
+//nolint:gochecknoglobals // 适配器表是只读静态数据，初始化后不变更。
+var providerGrokChatAdapter = newOpenAICompatibleChatAdapter(providerGrokPath)
+
+func newOpenAICompatibleChatAdapter(path string) providerAdapter {
+	return providerAdapter{
+		buildPath: func(string) string { return path },
+		buildBody: func(model, prompt string) ([]byte, error) {
+			return json.Marshal(map[string]any{
+				"model":      model,
+				"messages":   []map[string]string{{"role": "user", "content": prompt}},
+				"max_tokens": monitorChallengeMaxTokens,
+				"stream":     false,
+			})
+		},
+		buildHeaders: func(apiKey string) map[string]string {
+			return map[string]string{"Authorization": "Bearer " + apiKey}
+		},
+		textPath: "choices.0.message.content",
+	}
 }
 
 //nolint:gochecknoglobals // 适配器表是只读静态数据，初始化后不变更。
@@ -265,36 +248,8 @@ var providerOpenAIResponsesAdapter = providerAdapter{
 	textPath: "output.0.content.0.text",
 }
 
-//nolint:gochecknoglobals // 适配器表是只读静态数据，初始化后不变更。
-var providerOpenAIImagesAdapter = providerAdapter{
-	buildPath: func(string) string { return providerOpenAIImagesPath },
-	buildBody: func(model, _ string) ([]byte, error) {
-		return json.Marshal(map[string]any{
-			"model":           model,
-			"prompt":          monitorOpenAIImagePrompt,
-			"n":               1,
-			"response_format": "b64_json",
-			"stream":          true,
-		})
-	},
-	buildHeaders: func(apiKey string) map[string]string {
-		return map[string]string{
-			"Authorization": "Bearer " + apiKey,
-			"Accept":        "text/event-stream",
-		}
-	},
-	textPath: "",
-}
-
-func isOpenAIImagesCheck(provider, model string) bool {
-	return provider == MonitorProviderOpenAI && isOpenAIImageGenerationModel(model)
-}
-
 // providerAdapterFor 按 provider + api_mode 选择具体 adapter。
-func providerAdapterFor(provider, model, apiMode string) (providerAdapter, string, bool) {
-	if provider == MonitorProviderOpenAI && isOpenAIImageGenerationModel(model) {
-		return providerOpenAIImagesAdapter, monitorAPIModeOpenAIImages, true
-	}
+func providerAdapterFor(provider, apiMode string) (providerAdapter, string, bool) {
 	if provider == MonitorProviderOpenAI && defaultAPIMode(apiMode) == MonitorAPIModeResponses {
 		return providerOpenAIResponsesAdapter, MonitorAPIModeResponses, true
 	}
@@ -314,7 +269,7 @@ func isSupportedProvider(p string) bool {
 //
 // 返回值：
 //   - extractedText: 按 textPath 抽出的成功文本，仅在 status 2xx 时有意义；非 2xx 时通常为空串
-//   - rawBody: 完整响应体的字符串形式（按请求类型限制最大读取字节），用于错误路径保留上游真实回包
+//   - rawBody: 完整响应体的字符串形式（已被 monitorResponseMaxBytes 截断），用于错误路径保留上游真实回包
 //   - status: HTTP 状态码
 //   - err: 网络 / 序列化错误
 func callProvider(ctx context.Context, provider, endpoint, apiKey, model, prompt string, opts *CheckOptions) (extractedText, rawBody string, status int, err error) {
@@ -322,7 +277,7 @@ func callProvider(ctx context.Context, provider, endpoint, apiKey, model, prompt
 	if err := validateAPIMode(provider, requestedAPIMode); err != nil {
 		return "", "", 0, err
 	}
-	adapter, apiMode, ok := providerAdapterFor(provider, model, requestedAPIMode)
+	adapter, apiMode, ok := providerAdapterFor(provider, requestedAPIMode)
 	if !ok {
 		return "", "", 0, fmt.Errorf("unsupported provider %q", provider)
 	}
@@ -332,63 +287,41 @@ func callProvider(ctx context.Context, provider, endpoint, apiKey, model, prompt
 	}
 	headers := mergeHeaders(adapter.buildHeaders(apiKey), opts)
 	full := joinURL(endpoint, adapter.buildPath(model))
-	responseLimit := int64(monitorResponseMaxBytes)
-	client := monitorHTTPClient
-	isImageAPI := provider == MonitorProviderOpenAI && apiMode == monitorAPIModeOpenAIImages
-	if isImageAPI {
-		responseLimit = int64(monitorImageResponseMaxBytes)
-		client = monitorImageHTTPClient
-	}
-	respBytes, status, err := postRawJSON(ctx, client, full, body, headers, responseLimit)
+	respBytes, status, err := postRawJSON(ctx, full, body, headers)
 	if err != nil {
 		return "", "", status, err
-	}
-	if isImageAPI && shouldRetryOpenAIImageWithoutStream(status, respBytes) {
-		retryBody, retryHeaders, retryErr := buildOpenAIImageNonStreamingRetry(body, headers)
-		if retryErr == nil {
-			respBytes, status, err = postRawJSON(ctx, client, full, retryBody, retryHeaders, responseLimit)
-			if err != nil {
-				return "", "", status, err
-			}
-		}
 	}
 	if provider == MonitorProviderOpenAI && apiMode == MonitorAPIModeResponses {
 		return extractOpenAIResponsesText(respBytes), string(respBytes), status, nil
 	}
-	return gjson.GetBytes(respBytes, adapter.textPath).String(), string(respBytes), status, nil
+	return extractMonitorResponseText(adapter, respBytes), string(respBytes), status, nil
 }
 
-func shouldRetryOpenAIImageWithoutStream(status int, body []byte) bool {
-	if status != http.StatusBadRequest && status != http.StatusUnprocessableEntity {
-		return false
+func extractMonitorResponseText(adapter providerAdapter, respBytes []byte) string {
+	if adapter.extractText != nil {
+		return adapter.extractText(respBytes)
 	}
-	lower := strings.ToLower(string(body))
-	if !strings.Contains(lower, "stream") {
-		return false
-	}
-	return strings.Contains(lower, "unsupported") ||
-		strings.Contains(lower, "not supported") ||
-		strings.Contains(lower, "unrecognized") ||
-		strings.Contains(lower, "unknown") ||
-		strings.Contains(lower, "invalid")
+	return gjson.GetBytes(respBytes, adapter.textPath).String()
 }
 
-func buildOpenAIImageNonStreamingRetry(body []byte, headers map[string]string) ([]byte, map[string]string, error) {
-	var parsed map[string]any
-	if err := json.Unmarshal(body, &parsed); err != nil {
-		return nil, nil, fmt.Errorf("unmarshal image retry body: %w", err)
+func extractAnthropicMonitorText(respBytes []byte) string {
+	content := gjson.GetBytes(respBytes, "content")
+	if !content.IsArray() {
+		return ""
 	}
-	delete(parsed, "stream")
-	retryBody, err := json.Marshal(parsed)
-	if err != nil {
-		return nil, nil, fmt.Errorf("marshal image retry body: %w", err)
-	}
-	retryHeaders := make(map[string]string, len(headers)+1)
-	for k, v := range headers {
-		retryHeaders[k] = v
-	}
-	retryHeaders["Accept"] = "application/json"
-	return retryBody, retryHeaders, nil
+
+	parts := make([]string, 0, 1)
+	content.ForEach(func(_, item gjson.Result) bool {
+		if item.Get("type").String() != "text" {
+			return true
+		}
+		text := strings.TrimSpace(item.Get("text").String())
+		if text != "" {
+			parts = append(parts, text)
+		}
+		return true
+	})
+	return strings.Join(parts, "\n")
 }
 
 // extractOpenAIResponsesText 聚合 Responses API 的最终 assistant 文本。
@@ -511,9 +444,9 @@ func buildRequestBody(adapter providerAdapter, provider, apiMode, model, prompt 
 var bodyMergeKeyDenyList = map[string]map[string]bool{
 	MonitorProviderOpenAI + ":" + MonitorAPIModeChatCompletions: {"model": true, "messages": true, "stream": true},
 	MonitorProviderOpenAI + ":" + MonitorAPIModeResponses:       {"model": true, "instructions": true, "input": true, "stream": true},
-	MonitorProviderOpenAI + ":" + monitorAPIModeOpenAIImages:    {"model": true, "prompt": true, "n": true, "response_format": true, "stream": true},
-	MonitorProviderAnthropic:                                    {"model": true, "messages": true},
-	MonitorProviderGemini:                                       {"contents": true},
+	MonitorProviderGrok:      {"model": true, "messages": true, "stream": true},
+	MonitorProviderAnthropic: {"model": true, "messages": true},
+	MonitorProviderGemini:    {"contents": true},
 }
 
 func checkAPIMode(opts *CheckOptions) string {
@@ -531,7 +464,7 @@ func bodyMergeDenyKey(provider, apiMode string) string {
 }
 
 func validateReplaceRequestBody(provider, apiMode string, body map[string]any) error {
-	if provider != MonitorProviderOpenAI {
+	if provider != MonitorProviderOpenAI && provider != MonitorProviderGrok {
 		return nil
 	}
 	switch defaultAPIMode(apiMode) {
@@ -571,7 +504,7 @@ func hasNonEmptyBodyValue(v any) bool {
 
 // postRawJSON 发送 POST + 已序列化好的 JSON 字节，限制响应体大小，返回响应字节、HTTP status、错误。
 // adapter 自行 marshal 是为了精确控制字段顺序与类型，所以这里直接收 []byte 而不是 any。
-func postRawJSON(ctx context.Context, client *http.Client, fullURL string, payload []byte, headers map[string]string, responseLimit int64) ([]byte, int, error) {
+func postRawJSON(ctx context.Context, fullURL string, payload []byte, headers map[string]string) ([]byte, int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, 0, fmt.Errorf("build request: %w", err)
@@ -582,19 +515,13 @@ func postRawJSON(ctx context.Context, client *http.Client, fullURL string, paylo
 		req.Header.Set(k, v)
 	}
 
-	if client == nil {
-		client = monitorHTTPClient
-	}
-	resp, err := client.Do(req)
+	resp, err := monitorHTTPClient.Do(req)
 	if err != nil {
 		return nil, 0, fmt.Errorf("do request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if responseLimit <= 0 {
-		responseLimit = monitorResponseMaxBytes
-	}
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, responseLimit))
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, monitorResponseMaxBytes))
 	if err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("read body: %w", err)
 	}
@@ -638,6 +565,8 @@ var monitorAPIKeyPatterns = []struct {
 	{regexp.MustCompile(`sk-ant-[A-Za-z0-9_-]{20,}`), "sk-ant-***REDACTED***"},
 	// OpenAI / Anthropic 通用 sk-: sk-xxxxxxx
 	{regexp.MustCompile(`sk-[A-Za-z0-9-]{20,}`), "sk-***REDACTED***"},
+	// xAI API Key：xai-xxxxxxx
+	{regexp.MustCompile(`xai-[A-Za-z0-9_-]{6,}`), "xai-***REDACTED***"},
 	// Gemini / Google API Key：固定前缀 + 35 位
 	{regexp.MustCompile(`AIza[A-Za-z0-9_-]{35}`), "AIza***REDACTED***"},
 	// JWT 三段式（Bearer 后常出现）：eyJxxx.eyJxxx.signature
@@ -647,7 +576,7 @@ var monitorAPIKeyPatterns = []struct {
 // sanitizeErrorMessage 擦除错误/响应文本中可能泄露的 API key。
 // 处理两类来源：
 //  1. URL query 中的 ?key= / ?api_key= 等（Go *url.Error 会回填完整 URL）
-//  2. 上游 HTTP body 文本里直接出现的 sk-* / AIza* / JWT 等密钥碎片
+//  2. 上游 HTTP body 文本里直接出现的 sk-* / xai-* / AIza* / JWT 等密钥碎片
 //
 // 注意：与 gemini_messages_compat_service.go 的 sanitizeUpstreamErrorMessage 关注点类似但参数集更广，
 // 监控模块独立维护，避免互相耦合。

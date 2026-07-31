@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/Wei-Shaw/sub2api/internal/handler/admin"
+	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
 )
 
 // AdminHandlers contains all admin-related HTTP handlers
@@ -35,10 +36,12 @@ type AdminHandlers struct {
 	ChannelMonitor         *admin.ChannelMonitorHandler
 	ChannelMonitorTemplate *admin.ChannelMonitorRequestTemplateHandler
 	ContentModeration      *admin.ContentModerationHandler
+	PromptAudit            *securityaudit.PromptAdminHandler
 	Payment                *admin.PaymentHandler
 	Affiliate              *admin.AffiliateHandler
 	ImageWorkspace         *admin.ImageWorkspaceHandler
 	Compliance             *admin.ComplianceHandler
+	AuditLog               *admin.AuditLogHandler
 }
 
 // Handlers contains all HTTP handlers
@@ -56,9 +59,12 @@ type Handlers struct {
 	OpenAIGateway    *OpenAIGatewayHandler
 	Setting          *SettingHandler
 	Totp             *TotpHandler
+	Passkey          *PasskeyHandler
 	Payment          *PaymentHandler
 	PaymentWebhook   *PaymentWebhookHandler
 	AvailableChannel *AvailableChannelHandler
+	ModelPlaza       *ModelPlazaHandler
+	AsyncImage       *AsyncImageHandler
 	ImageWorkspace   *ImageWorkspaceHandler
 	BatchImage       *BatchImageHandler
 }
