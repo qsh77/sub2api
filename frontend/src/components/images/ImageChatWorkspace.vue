@@ -439,8 +439,8 @@ async function selectProject(id: number) {
   selectedProjectId.value = id
   writeStoredImageProjectSelection(props.scope, id)
   selectedDetail.value = isAdmin.value ? await adminAPI.images.get(id) : await getImageProject(id)
-  if (!selectedDetail.value.versions.some((item) => item.id === selectedVersionId.value)) {
-    selectedVersionId.value = selectedDetail.value.versions.at(-1)?.id || null
+  if (!selectedDetail.value!.versions.some((item) => item.id === selectedVersionId.value)) {
+    selectedVersionId.value = selectedDetail.value!.versions.at(-1)?.id || null
   }
 }
 
