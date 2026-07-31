@@ -607,7 +607,7 @@ async function deleteImageProjectRecord(projectId: number, recordId: string) {
   if (deletingRecordId.value) return
   deletingRecordId.value = recordId
   try {
-    if (isAdmin.value) await adminAPI.images.delete(projectId)
+    if (isAdmin.value) await adminAPI.images.deleteProject(projectId)
     else await deleteImageProject(projectId)
     imageProjects.value = imageProjects.value.filter((project) => project.id !== projectId)
     if (readStoredImageProjectSelection(props.scope) === projectId) {
@@ -828,6 +828,7 @@ function collectUserGroups(channelList: UserAvailableChannel[], keys: ApiKey[]):
           weekly_limit_usd: null,
           monthly_limit_usd: null,
           allow_image_generation: false,
+          allow_live: false,
           allow_batch_image_generation: false,
           image_rate_independent: false,
           image_rate_multiplier: 1,

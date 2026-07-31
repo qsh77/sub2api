@@ -495,7 +495,7 @@ async function deleteImageProjectRecord(projectId: number, recordId: string) {
   if (deletingRecordId.value) return
   deletingRecordId.value = recordId
   try {
-    if (isAdmin.value) await adminAPI.images.delete(projectId)
+    if (isAdmin.value) await adminAPI.images.deleteProject(projectId)
     else await deleteImageProject(projectId)
     const nextProjects = projects.value.filter((project) => project.id !== projectId)
     projects.value = nextProjects
